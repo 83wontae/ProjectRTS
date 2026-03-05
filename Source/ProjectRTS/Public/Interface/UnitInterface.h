@@ -36,5 +36,5 @@ public:
 
     /** 팀 인덱스를 즉시 반환하는 함수 (성능 최적화용) */
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
-    int32 GetTeamIndex();
+    int32 GetFaction();
 };

@@ -41,13 +41,13 @@ void UTeamSysComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UTeamSysComponent, m_TeamIndex); // TeamIndex 복제 등록
+	DOREPLIFETIME(UTeamSysComponent, m_Faction); // Faction 복제 등록
 	DOREPLIFETIME(UTeamSysComponent, m_Leader);    // Leader 복제 등록
 }
 
-void UTeamSysComponent::OnRep_TeamIndex()
+void UTeamSysComponent::OnRep_Faction()
 {
-	OnTeamChanged.Broadcast(m_TeamIndex);
+	OnTeamChanged.Broadcast(m_Faction);
 }
 
 void UTeamSysComponent::OnRep_Leader()
@@ -55,12 +55,12 @@ void UTeamSysComponent::OnRep_Leader()
 	OnLeaderChanged.Broadcast(m_Leader);
 }
 
-void UTeamSysComponent::SetTeam(int32 NewTeamIndex)
+void UTeamSysComponent::SetTeam(int32 NewFaction)
 {
 	if (GetOwnerRole() == ROLE_Authority) // 서버에서만 값 변경
 	{
-		m_TeamIndex = NewTeamIndex;
-		OnRep_TeamIndex(); // 서버에서도 수동 호출하여 로직 실행
+		m_Faction = NewFaction;
+		OnRep_Faction(); // 서버에서도 수동 호출하여 로직 실행
 	}
 }
 
@@ -75,7 +75,7 @@ void UTeamSysComponent::SetLeader(AActor* NewLeader)
 			m_Leader = NewLeader;
 			OnRep_Leader();
 
-			SetTeam(LeaderTeamComp->m_TeamIndex);
+			SetTeam(LeaderTeamComp->m_Faction);
 		}
 		else
 		{
@@ -96,7 +96,7 @@ bool UTeamSysComponent::IsAlly(AActor* TargetActor) const
 
 	if (TargetActor->Implements<UUnitInterface>())
 	{
-		return IsAllyByTeamIndex(IUnitInterface::Execute_GetTeamIndex(TargetActor));
+		return IsAllyByFaction(IUnitInterface::Execute_GetFaction(TargetActor));
 	}
 	return true;
 }
@@ -106,12 +106,12 @@ bool UTeamSysComponent::IsEnemy(AActor* TargetActor) const
 	return !IsAlly(TargetActor);
 }
 
-bool UTeamSysComponent::IsAllyByTeamIndex(int32 TeamIndex) const
+bool UTeamSysComponent::IsAllyByFaction(int32 Faction) const
 {
-	return (TeamIndex== m_TeamIndex);
+	return (Faction== m_Faction);
 }
 
-bool UTeamSysComponent::IsEnemyByTeamIndex(int32 TeamIndex) const
+bool UTeamSysComponent::IsEnemyByFaction(int32 Faction) const
 {
-	return !IsAllyByTeamIndex(TeamIndex);
+	return !IsAllyByFaction(Faction);
 }
