@@ -155,3 +155,28 @@ struct FST_Unit : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
     double Speed;
 };
+
+/** 스킬 데이터 구조체 (DataTable용) */
+USTRUCT(BlueprintType)
+struct FST_Skill : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    FString Name;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    class UTexture2D* Icon;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    class UAnimMontage* SkillAnim;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    float CooldownTime;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    float ManaCost;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    float Range;
+};
