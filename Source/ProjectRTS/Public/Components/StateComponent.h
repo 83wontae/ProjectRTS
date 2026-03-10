@@ -42,6 +42,14 @@ public:
     UFUNCTION()
     void OnRep_CurHp();
 
+    /** 타겟 설정 함수 */
+    UFUNCTION(BlueprintCallable, Category = "RTS|State")
+    void SetAggroTarget(AActor* NewTarget) { m_AggroTarget = NewTarget; }
+
+    /** 타겟 가져오기 함수 */
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    AActor* GetAggroTarget() const { return m_AggroTarget.Get(); }
+
 protected:
     /** 사망 시 처리 로직 **/
     void HandleDeath();
@@ -61,6 +69,11 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
     FOnEventDeath EventDispatcher_EventDeath;
+
+protected:
+    /** 현재 추적 및 공격 중인 대상 (어그로 타겟) */
+    UPROPERTY(Replicated, BlueprintReadWrite, Category = "RTS|State")
+    TWeakObjectPtr<AActor> m_AggroTarget;
 
 private:
     UPROPERTY()

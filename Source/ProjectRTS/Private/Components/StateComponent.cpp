@@ -7,7 +7,7 @@
 #include "Kismet/KismetMathLibrary.h"
 
 // Sets default values for this component's properties
-UStateComponent::UStateComponent()
+UStateComponent::UStateComponent() :m_CurHp(100.0), m_MaxHp(100.0)
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.

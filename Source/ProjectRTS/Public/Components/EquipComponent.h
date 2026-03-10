@@ -7,17 +7,26 @@
 #include "Global/ProjectRTSTypes.h"
 #include "EquipComponent.generated.h"
 
-// 장비 변경 알림을 위한 델리게이트
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateWeapon, const FST_Weapon&, NewWeapon);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateArmor, EEquipType, Type, const FST_Armor&, NewArmor);
+/** 무기 장착 슬롯 구분 */
+UENUM(BlueprintType)
+enum class EWeaponSlot : uint8
+{
+	LeftHand	UMETA(DisplayName = "Left Hand"),
+	RightHand	UMETA(DisplayName = "Right Hand")
+};
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateWeapon, EWeaponSlot, Slot, const FST_Weapon&, NewWeapon);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateArmor, EEquipType, Type, const FST_Armor&, NewArmor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateBattleAnimType, EBattleAnimType, NewAnimType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateRideState, bool, bIsRiding);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateUnitBody, const FST_Unit&, UnitData);
+
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTRTS_API UEquipComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
-	// Sets default values for this component's properties
+public:
 	UEquipComponent();
 
 protected:
@@ -25,37 +34,68 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-	/** 무기 장착 함수 [cite: 1089-1090] */
+	/** RowName을 사용하여 무기를 장착합니다. */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
-	void EquipWeapon(const FST_Weapon& NewWeapon);
+	void EquipWeaponByName(FName WeaponName, EWeaponSlot Slot);
 
-	/** 방어구 장착 함수 [cite: 1120-1121] */
+	/** RowName을 사용하여 방어구를 장착합니다. */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
-	void EquipArmor(const FST_Armor& NewArmor);
+	void EquipArmorByName(FName ArmorName, EEquipType Type);
 
-	/** 유닛 데이터로부터 전체 장비 초기화 [cite: 1244-1245] */
+	/** 유닛 데이터(구조체)를 받아 초기 외형을 설정합니다. (내부적으로 Name 방식으로 전환 가능) */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
-	void EquipToUnitData(const FST_Unit& UnitData);
+	void EquipToUnitData(FName InUnitRowName);
 
-	// --- OnRep 함수 --- 
-	UFUNCTION() void OnRep_Weapon();
-	UFUNCTION() void OnRep_ArmorHead();
-	UFUNCTION() void OnRep_ArmorBody();
-	UFUNCTION() void OnRep_ArmorHorse();
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	bool IsRideState() const { return !m_ArmorHorseName.IsNone(); }
+
+	/** 데이터 테이블 조회가 필요한 경우를 위해 데이터 반환 함수 제공 */
+	const FST_Unit* GetUnitData(FName InUnitRowName) const;
+
+	// --- OnRep 함수 ---
+	UFUNCTION() void OnRep_UnitRowName();
+	UFUNCTION() void OnRep_RightWeaponName();
+	UFUNCTION() void OnRep_LeftWeaponName();
+	UFUNCTION() void OnRep_ArmorHeadName();
+	UFUNCTION() void OnRep_ArmorBodyName();
+	UFUNCTION() void OnRep_ArmorHorseName();
+	UFUNCTION() void OnRep_BattleAnimType();
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Combat")
+	void UpdateBattleAnimType();
 
 public:
-	// --- 장비 변수 (네트워크 복제) --- 
-	UPROPERTY(ReplicatedUsing = OnRep_Weapon, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_Weapon m_Weapon;
+	UPROPERTY(ReplicatedUsing = OnRep_UnitRowName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_UnitRowName;
 
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorHead, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_Armor m_Armor_Head;
+	// --- 장비 RowName (네트워크 복제 최적화) --- 
+	UPROPERTY(ReplicatedUsing = OnRep_RightWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_RightWeaponName;
 
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorBody, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_Armor m_Armor_Body;
+	UPROPERTY(ReplicatedUsing = OnRep_LeftWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_LeftWeaponName;
 
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorHorse, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_Armor m_Armor_Horse;
+	UPROPERTY(ReplicatedUsing = OnRep_ArmorHeadName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_ArmorHeadName;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ArmorBodyName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_ArmorBodyName;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ArmorHorseName, BlueprintReadWrite, Category = "RTS|Equip")
+	FName m_ArmorHorseName;
+
+	// --- 데이터 테이블 포인터 (에디터에서 할당) ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+	class UDataTable* UnitTable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+	class UDataTable* WeaponTable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+	class UDataTable* ArmorTable;
+
+	UPROPERTY(ReplicatedUsing = OnRep_BattleAnimType, BlueprintReadWrite, Category = "RTS|Combat")
+	EBattleAnimType m_BattleAnimType;
 
 	// --- 이벤트 ---
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
@@ -64,9 +104,18 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
 	FOnUpdateArmor OnUpdateArmor;
 
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
+	FOnUpdateRideState OnUpdateRideState;
+
+	/** 애니메이션 타입 변경 시 발생하는 이벤트 */
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
+	FOnUpdateBattleAnimType OnUpdateBattleAnimType;
+
+	/** 유닛 본체 업데이트 이벤트 */
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
+	FOnUpdateUnitBody OnUpdateUnitBody;
+
 private:
-	/** 장착된 장비에 맞춰 메시 업데이트 */
-	void UpdateMesh();
 
 	UPROPERTY()
 	class ACharacter* OwnerChar;

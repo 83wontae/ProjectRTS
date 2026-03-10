@@ -137,9 +137,6 @@ struct FST_Unit : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Parts")
     class USkeletalMesh* BodyPart;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Parts")
-    class USkeletalMesh* HorsePart;
-
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
     double AttackRange;
 
