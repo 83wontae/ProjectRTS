@@ -41,10 +41,6 @@ public:
     void UpdateArmorMesh(EEquipType Type, class USkeletalMesh* NewMesh);
 
 public:
-    // --- 핵심 컴포넌트 ---
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-    class UTeamSysComponent* TeamComp;
-
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class UStateComponent* StateComp;
 

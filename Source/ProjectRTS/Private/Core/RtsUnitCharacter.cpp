@@ -1,5 +1,4 @@
 #include "Core/RtsUnitCharacter.h"
-#include "Components/TeamSysComponent.h"
 #include "Components/StateComponent.h"
 #include "Components/EquipComponent.h"
 #include "Components/SkillComponent.h"
@@ -27,7 +26,6 @@ ARtsUnitCharacter::ARtsUnitCharacter()
     HorseMesh->SetupAttachment(GetMesh());
 
     // 기능 컴포넌트 생성
-    TeamComp = CreateDefaultSubobject<UTeamSysComponent>(TEXT("TeamComponent"));
     StateComp = CreateDefaultSubobject<UStateComponent>(TEXT("StateComponent"));
     EquipComp = CreateDefaultSubobject<UEquipComponent>(TEXT("EquipComponent"));
     SkillComp = CreateDefaultSubobject<USkillComponent>(TEXT("SkillComponent"));
@@ -145,7 +143,7 @@ void ARtsUnitCharacter::UpdateArmorMesh(EEquipType Type, USkeletalMesh* NewMesh)
 
 int32 ARtsUnitCharacter::GetFaction_Implementation() const
 {
-    return TeamComp ? TeamComp->m_Faction : -1;
+    return StateComp ? StateComp->m_Faction : -1;
 }
 
 bool ARtsUnitCharacter::IsRiding_Implementation() const

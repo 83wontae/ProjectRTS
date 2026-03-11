@@ -31,7 +31,10 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -61,6 +64,9 @@ public:
 
 	/** 장착 로직 내부 처리 함수 */
 	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
+
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	float GetAttackRange() const;
 
 	// --- OnRep 함수 ---
 	UFUNCTION() void OnRep_UnitRowName();

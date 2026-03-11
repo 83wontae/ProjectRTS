@@ -37,6 +37,26 @@ void UEquipComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(UEquipComponent, m_BattleAnimType);
 }
 
+void UEquipComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 1. 오른손 무기가 존재한다면 파괴
+	if (WeaponActor_R && IsValid(WeaponActor_R))
+	{
+		WeaponActor_R->Destroy();
+		WeaponActor_R = nullptr;
+	}
+
+	// 2. 왼손(또는 방패) 무기가 존재한다면 파괴
+	if (WeaponActor_L && IsValid(WeaponActor_L))
+	{
+		WeaponActor_L->Destroy();
+		WeaponActor_L = nullptr;
+	}
+
+	// 부모 클래스의 EndPlay 호출을 잊지 마세요!
+	Super::EndPlay(EndPlayReason);
+}
+
 #if WITH_EDITOR
 void UEquipComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
@@ -293,4 +313,45 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 			*TargetActorVar = NewWeapon;
 		}
 	}
+}
+
+float UEquipComponent::GetAttackRange() const
+{
+	// 1. 우선순위: 오른손 무기 데이터 확인
+	if (WeaponTable && !m_RightWeaponName.IsNone())
+	{
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("GetRange"));
+		if (WeaponData)
+		{
+			return (float)WeaponData->AttackRange;
+		}
+	}
+
+	// 2. 차순위: 왼손 무기 데이터 확인 (활이나 양손 무기 대응)
+	if (WeaponTable && !m_LeftWeaponName.IsNone())
+	{
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("GetRange"));
+		if (WeaponData)
+		{
+			// 무기 타입이 Shield가 아닌 경우에만 사거리로 인정하는 로직을 추가할 수도 있습니다.
+			if (WeaponData->WeaponType != EWeaponType::Shield)
+			{
+				return (float)WeaponData->AttackRange;
+			}
+		}
+	}
+
+	// 3. 무기가 없을 때: 유닛 기본 데이터 테이블에서 사거리 반환
+	if (UnitTable && !m_UnitRowName.IsNone())
+	{
+		const FST_Unit* UnitData = GetUnitData(m_UnitRowName);
+		if (UnitData)
+		{
+			// FST_Unit 구조체에도 AttackRange 변수가 정의되어 있어야 합니다.
+			return (float)UnitData->AttackRange;
+		}
+	}
+
+	// 모든 데이터가 없을 경우 기본값 반환
+	return 0.0f;
 }

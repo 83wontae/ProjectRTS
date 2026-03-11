@@ -64,6 +64,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|State")
     double m_MaxHp = 100.0;
 
+    // --- 팀 시스템 변수 및 함수 ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+    int32 m_Faction;
+
     UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
     FOnUpdateHp EventDispatcher_UpdateHp;
 
@@ -74,7 +78,7 @@ protected:
     /** 현재 추적 및 공격 중인 대상 (어그로 타겟) */
     UPROPERTY(Replicated, BlueprintReadWrite, Category = "RTS|State")
     TWeakObjectPtr<AActor> m_AggroTarget;
-
+    
 private:
     UPROPERTY()
     class ACharacter* OwnerChar;
