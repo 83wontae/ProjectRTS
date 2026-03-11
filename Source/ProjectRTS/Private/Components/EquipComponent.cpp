@@ -216,13 +216,15 @@ void UEquipComponent::UpdateBattleAnimType()
 
 FName UEquipComponent::GetTargetSocketName(const FST_Weapon& WeaponData, EWeaponSlot RequestedSlot) const
 {
-	// 1. 방패 제약 확인
-	if (WeaponData.HandConstraint == EWeaponHandConstraint::Shield)
+	// 1. 우선적으로 무기 유형이 Shield인지 확인합니다.
+	// 또는 HandConstraint가 Shield인 경우에도 ShieldSocketName을 반환합니다.
+	if (WeaponData.WeaponType == EWeaponType::Shield ||
+		WeaponData.HandConstraint == EWeaponHandConstraint::Shield)
 	{
-		return ShieldSocketName;
+		return ShieldSocketName; // "Shield_Socket"
 	}
 
-	// 2. 강제 손 제약 확인
+	// 2. 그 외 강제 손 제약 확인
 	if (WeaponData.HandConstraint == EWeaponHandConstraint::ForceLeft) return LeftHandSocketName;
 	if (WeaponData.HandConstraint == EWeaponHandConstraint::ForceRight) return RightHandSocketName;
 
@@ -232,42 +234,54 @@ FName UEquipComponent::GetTargetSocketName(const FST_Weapon& WeaponData, EWeapon
 
 void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot)
 {
-	// 2. 템플릿 객체인 경우 스폰 로직 원천 봉쇄
 	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject)) return;
 
-	// 월드 포인터가 없으면 스폰 불가
 	UWorld* World = GetWorld();
-	if (!World) return;
+	if (!World || !WeaponTable || !WeaponClass) return;
 
-	// 3. 소유자 캐릭터 안전하게 가져오기
-	ACharacter* TargetChar = OwnerChar;
-	if (!TargetChar) TargetChar = Cast<ACharacter>(GetOwner());
+	ACharacter* TargetChar = OwnerChar ? OwnerChar : Cast<ACharacter>(GetOwner());
+	if (!TargetChar) return;
 
-	// 타겟 캐릭터나 테이블이 없으면 즉시 종료
-	if (!TargetChar || !WeaponTable || !WeaponClass || WeaponName.IsNone()) return;
+	// --- [기존 무기 해제 로직] ---
+	// 1. 요청된 슬롯에 따라 현재 관리 중인 변수를 선택합니다.
+	AWeapon** CurrentSlotVar = (RequestedSlot == EWeaponSlot::RightHand) ? &WeaponActor_R : &WeaponActor_L;
 
+	// 2. [핵심] 새로운 값이 None이라면, 해당 슬롯의 무기를 지우고 종료합니다.
+	if (WeaponName.IsNone())
+	{
+		if (*CurrentSlotVar && IsValid(*CurrentSlotVar))
+		{
+			(*CurrentSlotVar)->Destroy();
+			*CurrentSlotVar = nullptr;
+		}
+		return;
+	}
+
+	// --- [새로운 무기 장착 로직] ---
+	// 3. 데이터 조회
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("Attachment"));
 	if (!Data) return;
 
+	// 4. 제공해주신 데이터(WeaponType 등)를 기반으로 소켓 결정
 	FName FinalSocket = GetTargetSocketName(*Data, RequestedSlot);
+
+	// 5. 방패나 왼손 무기는 무조건 WeaponActor_L 변수에서 관리하도록 타겟 변수를 재설정합니다.
 	AWeapon** TargetActorVar = (FinalSocket == RightHandSocketName) ? &WeaponActor_R : &WeaponActor_L;
 
-	// 4. 기존 무기 제거 (IsValid 체크 강화)
+	// 6. 새로 장착될 위치에 이미 무기가 있다면 제거합니다.
 	if (*TargetActorVar && IsValid(*TargetActorVar))
 	{
 		(*TargetActorVar)->Destroy();
 		*TargetActorVar = nullptr;
 	}
 
-	// 5. 무기 스폰
+	// 7. 스폰 및 부착
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = GetOwner();
 	SpawnParams.Instigator = Cast<APawn>(GetOwner());
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// 월드를 통해 안전하게 스폰
 	AWeapon* NewWeapon = World->SpawnActor<AWeapon>(WeaponClass, SpawnParams);
-
 	if (NewWeapon)
 	{
 		NewWeapon->InitializeWeapon(WeaponTable, WeaponName);
