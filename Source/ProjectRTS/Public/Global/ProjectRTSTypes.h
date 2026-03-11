@@ -48,6 +48,15 @@ enum class EWeaponType : uint8
     Shield  UMETA(DisplayName = "Shield")
 };
 
+UENUM(BlueprintType)
+enum class EWeaponHandConstraint : uint8
+{
+    None,           // 어느 손이든 상관없음 (검, 단검 등)
+    ForceLeft,      // 무조건 왼손 (방패, 활)
+    ForceRight,     // 무조건 오른손
+    Shield          // 방패용
+};
+
 // --- [구조체 정의] ---
 
 /** 유닛 애니메이션 데이터 ＊*/
@@ -99,6 +108,9 @@ struct FST_Weapon : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     EWeaponType WeaponType;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    EWeaponHandConstraint HandConstraint;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     class UStaticMesh* StaticMesh;

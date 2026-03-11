@@ -33,6 +33,13 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+public:
+	void RefreshWeaponsInEditor();
+
 public:
 	/** RowName을 사용하여 무기를 장착합니다. */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
@@ -52,6 +59,9 @@ public:
 	/** 데이터 테이블 조회가 필요한 경우를 위해 데이터 반환 함수 제공 */
 	const FST_Unit* GetUnitData(FName InUnitRowName) const;
 
+	/** 장착 로직 내부 처리 함수 */
+	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
+
 	// --- OnRep 함수 ---
 	UFUNCTION() void OnRep_UnitRowName();
 	UFUNCTION() void OnRep_RightWeaponName();
@@ -69,10 +79,10 @@ public:
 	FName m_UnitRowName;
 
 	// --- 장비 RowName (네트워크 복제 최적화) --- 
-	UPROPERTY(ReplicatedUsing = OnRep_RightWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_RightWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
 	FName m_RightWeaponName;
 
-	UPROPERTY(ReplicatedUsing = OnRep_LeftWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_LeftWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
 	FName m_LeftWeaponName;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ArmorHeadName, BlueprintReadWrite, Category = "RTS|Equip")
@@ -116,7 +126,28 @@ public:
 	FOnUpdateUnitBody OnUpdateUnitBody;
 
 private:
-
 	UPROPERTY()
 	class ACharacter* OwnerChar;
+
+protected:
+	/** 스폰할 무기 베이스 클래스 (BP_Weapon 등을 할당) */
+	UPROPERTY(EditAnywhere, Category = "RTS|Equip|Settings")
+	TSubclassOf<class AWeapon> WeaponClass;
+
+	/** 소켓 이름 결정 보조 함수 */
+	FName GetTargetSocketName(const FST_Weapon& WeaponData, EWeaponSlot RequestedSlot) const;
+
+	// 스폰된 무기 액터 관리 변수
+	UPROPERTY() class AWeapon* WeaponActor_R;
+	UPROPERTY() class AWeapon* WeaponActor_L;
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Equip|Settings")
+	FName RightHandSocketName = TEXT("Weapon_Socket_R");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Equip|Settings")
+	FName LeftHandSocketName = TEXT("Weapon_Socket_L");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Equip|Settings")
+	FName ShieldSocketName = TEXT("Shield_Socket");
 };

@@ -51,27 +51,51 @@ void ARtsUnitCharacter::BeginPlay()
     InitializeUnit();
 }
 
+#if WITH_EDITOR
+void ARtsUnitCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+
+    FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+
+    // UnitRowName이 바뀌었을 때 실시간 업데이트
+    if (PropertyName == GET_MEMBER_NAME_CHECKED(ARtsUnitCharacter, UnitRowName))
+    {
+        if (EquipComp && !UnitRowName.IsNone())
+        {
+            // GetUnitData 함수가 EquipComp에 구현되어 있어야 합니다.
+            const FST_Unit* UnitData = EquipComp->GetUnitData(UnitRowName);
+            if (UnitData)
+            {
+                HandleUnitBodyUpdate(*UnitData);
+            }
+        }
+    }
+}
+#endif
+
 void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
 
-    // 에디터: 애니메이션 포즈 동기화
+    // 1. 메시 포즈 동기화
     if (GetMesh())
     {
         if (HeadMesh) HeadMesh->SetLeaderPoseComponent(GetMesh());
         if (HorseMesh) HorseMesh->SetLeaderPoseComponent(GetMesh());
     }
 
-    // 에디터 뷰포트 업데이트
+    // 2. 유닛 바디 업데이트
     if (EquipComp && !UnitRowName.IsNone())
     {
-        // 1. 컴포넌트가 소유한 테이블에서 데이터를 직접 가져옵니다.
         const FST_Unit* UnitData = EquipComp->GetUnitData(UnitRowName);
-        if (UnitData)
-        {
-            // 2. 메시 업데이트 함수 실행
-            HandleUnitBodyUpdate(*UnitData);
-        }
+        if (UnitData) HandleUnitBodyUpdate(*UnitData);
+    }
+
+    // 3. [추가] 무기 업데이트 (에디터 뷰포트용)
+    if (EquipComp)
+    {
+        EquipComp->RefreshWeaponsInEditor();
     }
 }
 
@@ -122,4 +146,13 @@ void ARtsUnitCharacter::UpdateArmorMesh(EEquipType Type, USkeletalMesh* NewMesh)
 int32 ARtsUnitCharacter::GetFaction_Implementation() const
 {
     return TeamComp ? TeamComp->m_Faction : -1;
+}
+
+bool ARtsUnitCharacter::IsRiding_Implementation() const
+{
+    if (EquipComp)
+    {
+        return EquipComp->IsRideState();
+    }
+    return false;
 }

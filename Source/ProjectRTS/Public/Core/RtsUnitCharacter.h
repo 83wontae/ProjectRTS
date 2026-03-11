@@ -17,8 +17,11 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-    /** 에디터 상에서의 시각적 동기화를 위한 Construction Script */
-    virtual void OnConstruction(const FTransform& Transform) override;
+#if WITH_EDITOR
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+	virtual void OnConstruction(const FTransform& Transform) override;
 
     /** EquipComponent의 데이터 갱신 알림을 처리하는 콜백 함수 */
     UFUNCTION()
@@ -27,6 +30,8 @@ protected:
 public:
     // --- IUnitInterface 구현 ---
     virtual int32 GetFaction_Implementation() const override;
+
+    virtual bool IsRiding_Implementation() const override;
 
     /** 유닛의 데이터를 강제 업데이트 (생성 및 데이터 변경 시 호출) */
     UFUNCTION(BlueprintCallable, Category = "RTS|Unit")

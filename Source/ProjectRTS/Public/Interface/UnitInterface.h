@@ -37,4 +37,8 @@ public:
     /** 팀 인덱스를 즉시 반환하는 함수 (성능 최적화용) */
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
     int32 GetFaction() const;
+
+    /** 유닛이 현재 말을 타고 있는 상태인지 반환합니다. */
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
+    bool IsRiding() const;
 };
