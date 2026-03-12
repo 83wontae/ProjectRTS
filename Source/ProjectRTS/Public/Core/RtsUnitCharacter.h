@@ -33,6 +33,12 @@ public:
 
     virtual bool IsRiding_Implementation() const override;
 
+    virtual bool IsDeath_Implementation() const override;
+
+    virtual float GetAttackRange_Implementation() const override;
+
+    virtual float GetDetectionRange_Implementation() const override;
+
     /** 유닛의 데이터를 강제 업데이트 (생성 및 데이터 변경 시 호출) */
     UFUNCTION(BlueprintCallable, Category = "RTS|Unit")
     void InitializeUnit();

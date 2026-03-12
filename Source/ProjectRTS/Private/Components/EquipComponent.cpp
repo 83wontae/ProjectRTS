@@ -355,3 +355,17 @@ float UEquipComponent::GetAttackRange() const
 	// 모든 데이터가 없을 경우 기본값 반환
 	return 0.0f;
 }
+
+float UEquipComponent::GetDetectionRange() const
+{
+	// 유닛 데이터 테이블에서 해당 유닛의 인지 범위를 가져옵니다.
+	if (UnitTable && !m_UnitRowName.IsNone())
+	{
+		if (const FST_Unit* Data = GetUnitData(m_UnitRowName))
+		{
+			return Data->DetectionRange;
+		}
+	}
+
+	return 800.0f; // 데이터가 없을 경우의 기본값
+}

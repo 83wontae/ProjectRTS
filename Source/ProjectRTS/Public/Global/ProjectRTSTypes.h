@@ -134,6 +134,22 @@ struct FST_Unit : public FTableRowBase
 {
     GENERATED_BODY()
 
+    // 생성자를 통한 기본값 설정
+    FST_Unit()
+        : Name(TEXT("New Unit"))
+        , UnitClass(nullptr)
+        , UnitType(EUnitType::None) // 프로젝트에 정의된 기본값 사용
+        , HeadPart(nullptr)
+        , BodyPart(nullptr)
+        , AttackRange(250.0f)      // 근접 기본 사거리
+        , Attack(10.0)
+        , Defend(0.0)
+        , MaxHp(100.0)
+        , Speed(500.0)            // 기본 이동 속도
+        , DetectionRange(2000.0f)  // 기본 인지 범위
+    {
+    }
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
     FString Name;
 
@@ -163,6 +179,9 @@ struct FST_Unit : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
     double Speed;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
+    float DetectionRange;
 };
 
 /** 스킬 데이터 구조체 (DataTable용) */

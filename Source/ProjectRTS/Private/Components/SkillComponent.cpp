@@ -3,82 +3,239 @@
 
 #include "Components/SkillComponent.h"
 #include "GameFramework/Character.h"
-#include "Components/StateComponent.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Interface/UnitInterface.h"
+#include "Core/RtsGameState.h"
 
-// Sets default values for this component's properties
 USkillComponent::USkillComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
+	PrimaryComponentTick.bCanEverTick = false; // 전투 루프를 BT에 맡기므로 틱을 끕니다.
 }
 
 void USkillComponent::BeginPlay()
 {
-    Super::BeginPlay();
-    OwnerChar = Cast<ACharacter>(GetOwner());
+	Super::BeginPlay();
+	OwnerChar = Cast<ACharacter>(GetOwner());
+	if (OwnerChar)
+	{
+		if (OwnerChar->GetMesh() && OwnerChar->GetMesh()->GetAnimInstance())
+		{
+			OwnerChar->GetMesh()->GetAnimInstance()->OnMontageEnded.AddDynamic(this, &USkillComponent::OnAttackMontageEnded);
+		}
+	}
+
+	AddSkill(GetDefaultAttackSkillName());
 }
 
-void USkillComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+AActor* USkillComponent::FindBestTargetInRange()
 {
-    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (!OwnerChar) return nullptr;
 
-    // 쿨타임 수치 감소 처리
-    for (auto It = m_CooldownMap.CreateIterator(); It; ++It)
-    {
-        It.Value() -= DeltaTime;
-        if (It.Value() <= 0.0f)
-        {
-            It.RemoveCurrent();
-        }
-        else
-        {
-            // UI 갱신을 위한 이벤트 호출
-            OnCooldownUpdated.Broadcast(It.Key(), It.Value());
-        }
-    }
+	ARtsGameState* GS = GetWorld()->GetGameState<ARtsGameState>();
+	if (!GS) return nullptr;
+
+	// 1. 인터페이스를 통해 DetectionRange 가져오기
+	float ScanRange = IUnitInterface::Execute_GetDetectionRange(OwnerChar);
+
+	// 2. 에러 로그 및 최소값 보정
+	if (ScanRange <= 0.0f)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[%s] FindBestTarget: DetectionRange is 0.0f! 데이터 테이블 설정을 확인하세요."), *OwnerChar->GetName());
+		ScanRange = 800.0f;
+	}
+
+	FVector CenterPos = OwnerChar->GetActorLocation();
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	TArray<AActor*> OutActors;
+	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), CenterPos, ScanRange, ObjectTypes, nullptr, { OwnerChar }, OutActors);
+
+	AActor* BestTarget = nullptr;
+	float MinDist = ScanRange;
+
+	for (AActor* Actor : OutActors)
+	{
+		if (Actor)
+		{
+			// GameState를 통한 진영 확인 및 인터페이스를 통한 사망 확인
+			if (GS->IsEnemyByActor(OwnerChar, Actor) && !IUnitInterface::Execute_IsDeath(Actor))
+			{
+				float Dist = FVector::Dist(CenterPos, Actor->GetActorLocation());
+				if (Dist < MinDist)
+				{
+					MinDist = Dist;
+					BestTarget = Actor;
+				}
+			}
+		}
+	}
+	return BestTarget;
 }
 
-bool USkillComponent::UseSkill(FName SkillName)
+bool USkillComponent::IsCanAttack(AActor* InTarget)
 {
-    if (IsInCooldown(SkillName)) return false;
+	if (!InTarget || !OwnerChar) return false;
 
-    const FST_Skill* SkillData = m_SkillMap.Find(SkillName);
-    if (!SkillData) return false;
+	// 1. 대상의 생존 여부 확인 (Interface)
+	if (InTarget->Implements<UUnitInterface>())
+	{
+		if (IUnitInterface::Execute_IsDeath(InTarget)) return false;
+	}
 
-    // StateComponent와 연동하여 마나(자원) 확인 로직 추가 가능
-    /*
-    UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
-    if (StateComp && StateComp->m_CurMp < SkillData->ManaCost) return false;
-    */
+	// 2. 소유자의 공격 사거리 확인 (Interface)
+	float AttackRange = 0.0f;
+	if (OwnerChar->Implements<UUnitInterface>())
+	{
+		AttackRange = IUnitInterface::Execute_GetAttackRange(OwnerChar);
+	}
 
-    // 1. 애니메이션 재생
-    if (OwnerChar && SkillData->SkillAnim)
-    {
-        OwnerChar->PlayAnimMontage(SkillData->SkillAnim);
-    }
-
-    // 2. 쿨타임 적용
-    if (SkillData->CooldownTime > 0.0f)
-    {
-        m_CooldownMap.Add(SkillName, SkillData->CooldownTime);
-    }
-
-    // 3. 시전 알림
-    OnSkillStarted.Broadcast(SkillName);
-
-    return true;
+	// 3. 거리 계산 및 판정
+	float Distance = FVector::Dist(OwnerChar->GetActorLocation(), InTarget->GetActorLocation());
+	return Distance <= AttackRange;
 }
 
-bool USkillComponent::IsInCooldown(FName SkillName) const
+bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 {
-    return m_CooldownMap.Contains(SkillName);
+	// 1. 초기 상태 체크 로그
+	if (!OwnerChar)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill Failed: OwnerChar is Null!"), *GetOwner()->GetName());
+		return false;
+	}
+
+	if (bIsAttacking)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill Skipped: Already Attacking."), *OwnerChar->GetName());
+		return false;
+	}
+
+	// 2. 스킬 이름 결정 로그
+	if (SkillName.IsNone())
+	{
+		SkillName = GetDefaultAttackSkillName();
+		UE_LOG(LogTemp, Log, TEXT("[%s] UseSkill: SkillName was None. Defaulted to [%s]"), *OwnerChar->GetName(), *SkillName.ToString());
+	}
+
+	// 3. 맵 데이터 검색 로그
+	const FST_Skill* SkillData = m_SkillMap.Find(SkillName);
+
+	// Fallback 로직 진입 시 로그
+	if (!SkillData && m_SkillMap.Num() > 0)
+	{
+		TArray<FName> Keys;
+		m_SkillMap.GetKeys(Keys);
+		FName FallbackName = Keys[0];
+		UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill: Requested skill [%s] not found. Falling back to first available: [%s]"),
+			*OwnerChar->GetName(), *SkillName.ToString(), *FallbackName.ToString());
+
+		SkillName = FallbackName;
+		SkillData = m_SkillMap.Find(SkillName);
+	}
+
+	// 4. 최종 실행 여부 판단 로그
+	if (SkillData)
+	{
+		if (SkillData->SkillAnim)
+		{
+			// 타겟 방향 회전
+			if (InTarget)
+			{
+				FVector Dir = InTarget->GetActorLocation() - OwnerChar->GetActorLocation();
+				Dir.Z = 0.f;
+				OwnerChar->SetActorRotation(FRotationMatrix::MakeFromX(Dir).Rotator());
+				UE_LOG(LogTemp, Verbose, TEXT("[%s] UseSkill: Rotating towards Target [%s]"), *OwnerChar->GetName(), *InTarget->GetName());
+			}
+
+			// 애니메이션 실행
+			bIsAttacking = true;
+			float Duration = OwnerChar->PlayAnimMontage(SkillData->SkillAnim);
+
+			UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill SUCCESS: Playing Montage [%s]. Duration: %.2f"),
+				*OwnerChar->GetName(), *SkillName.ToString(), Duration);
+
+			OnSkillStarted.Broadcast(SkillName);
+			return true;
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill FAILED: SkillData found for [%s], but SkillAnim is NULL!"),
+				*OwnerChar->GetName(), *SkillName.ToString());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill FAILED: Skill [%s] not found in m_SkillMap and no fallback possible."),
+			*OwnerChar->GetName(), *SkillName.ToString());
+	}
+
+	return false;
 }
 
-void USkillComponent::AddSkill(FName SkillName, const FST_Skill& SkillData)
+FName USkillComponent::GetDefaultAttackSkillName()
 {
-    m_SkillMap.Add(SkillName, SkillData);
+	if (!OwnerChar) return NAME_None;
+
+	// 1. 인터페이스를 통해 상태 확인
+	bool bIsRiding = IUnitInterface::Execute_IsRiding(OwnerChar);
+
+	// 사거리가 250 이상이면 원거리(Archer)로 판정하는 임시 로직
+	float AttackRange = IUnitInterface::Execute_GetAttackRange(OwnerChar);
+	bool bIsRanged = (AttackRange > 250.0f);
+
+	// 2. 조합에 따른 스킬 이름 결정
+	if (bIsRiding)
+	{
+		return bIsRanged ? FName("CavArcherAttack") : FName("CavAttack");
+	}
+	else
+	{
+		return bIsRanged ? FName("ArcherAttack") : FName("InfantryAttack");
+	}
 }
 
+void USkillComponent::AddSkill(FName SkillName)
+{
+	// 1. 유효성 체크 (테이블이 없거나 이름이 비어있으면 종료)
+	if (!SkillTable || SkillName.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] AddSkill: SkillTable is null or SkillName is None."), *GetOwner()->GetName());
+		return;
+	}
+
+	// 2. 데이터 테이블에서 스킬 데이터 찾기
+	// SkillData.csv 형식이 FST_Skill 구조체와 매핑되어 있어야 합니다.
+	FST_Skill* FoundData = SkillTable->FindRow<FST_Skill>(SkillName, TEXT(""));
+
+	if (FoundData)
+	{
+		// 3. 맵에 추가 (이미 존재하면 업데이트됨)
+		m_SkillMap.Add(SkillName, *FoundData);
+
+		UE_LOG(LogTemp, Log, TEXT("[%s] Successfully added skill: %s"), *GetOwner()->GetName(), *SkillName.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[%s] AddSkill: Failed to find skill [%s] in SkillTable!"),
+			*GetOwner()->GetName(), *SkillName.ToString());
+	}
+}
+
+void USkillComponent::ClearSkills()
+{
+	m_SkillMap.Empty();
+	m_CooldownMap.Empty();
+}
+
+void USkillComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	// [로그 추가] 몽타주 종료 시점 확인
+	UE_LOG(LogTemp, Warning, TEXT("[%s] OnAttackMontageEnded: Montage [%s] Finished. Interrupted: %s"),
+		*OwnerChar->GetName(), *Montage->GetName(), bInterrupted ? TEXT("True") : TEXT("False"));
+
+	bIsAttacking = false;
+
+	// [로그 추가] 상태 해제 확인
+	UE_LOG(LogTemp, Log, TEXT("[%s] bIsAttacking set to FALSE."), *OwnerChar->GetName());
+}

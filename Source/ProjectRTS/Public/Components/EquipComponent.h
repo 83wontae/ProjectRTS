@@ -68,6 +68,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	float GetAttackRange() const;
 
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	float GetDetectionRange() const;
+
 	// --- OnRep 함수 ---
 	UFUNCTION() void OnRep_UnitRowName();
 	UFUNCTION() void OnRep_RightWeaponName();

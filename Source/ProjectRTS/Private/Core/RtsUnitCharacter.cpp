@@ -154,3 +154,26 @@ bool ARtsUnitCharacter::IsRiding_Implementation() const
     }
     return false;
 }
+
+bool ARtsUnitCharacter::IsDeath_Implementation() const
+{
+    if (StateComp)
+    {
+		return StateComp->IsDeath();
+    }
+    return false;
+}
+
+float ARtsUnitCharacter::GetAttackRange_Implementation() const
+{
+    if (EquipComp)
+    {
+        return EquipComp->GetAttackRange();
+    }
+    return false;
+}
+
+float ARtsUnitCharacter::GetDetectionRange_Implementation() const
+{
+    return EquipComp ? EquipComp->GetDetectionRange() : 800.0f;
+}

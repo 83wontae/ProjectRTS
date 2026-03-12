@@ -41,4 +41,13 @@ public:
     /** 유닛이 현재 말을 타고 있는 상태인지 반환합니다. */
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
     bool IsRiding() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
+    bool IsDeath() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
+    float GetAttackRange() const;
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Unit")
+    float GetDetectionRange() const;
 };
