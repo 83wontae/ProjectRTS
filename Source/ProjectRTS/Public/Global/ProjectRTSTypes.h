@@ -208,3 +208,24 @@ struct FST_Skill : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
     float Range;
 };
+
+USTRUCT(BlueprintType)
+struct FST_Building : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+    FString Name;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+    TSubclassOf<AActor> BuildingClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+    class UStaticMesh* PreviewMesh; // 건설 전 보여줄 고스트 메쉬
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+    int32 GridSizeX = 1; // 1x1, 2x2 등
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
+    int32 GridSizeY = 1;
+};
