@@ -29,11 +29,7 @@ void APreviewBuilding::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 데칼용 다이내믹 머티리얼 생성 (머티리얼 노드의 GridColor 파라미터 제어용)
-	if (GridDecalComp)
-	{
-		DecalDynamicMaterial = GridDecalComp->CreateDynamicMaterialInstance();
-	}
+	CreateDynamicMaterial();
 
 	if (PlacementComp)
 	{
@@ -71,14 +67,26 @@ void APreviewBuilding::SetValidPlacement(bool bIsValid)
 	}
 }
 
-void APreviewBuilding::SetPreviewMesh(UStaticMesh* NewMesh)
+void APreviewBuilding::CreateDynamicMaterial()
 {
-	if (MeshComponent && NewMesh)
+	// 1. 메쉬 컴포넌트 유효성 확인
+	if (!MeshComponent) return;
+
+	// 2. 고스트 메쉬용 다이내믹 머티리얼 생성
+	// 메쉬의 원래 머티리얼 대신, 미리 설정한 GhostMaterialBase(홀로그램 머티리얼)를 사용하도록 권장
+	if (GhostMaterialBase)
 	{
-		MeshComponent->SetStaticMesh(NewMesh);
-		if (GhostMaterialBase)
+		// 이 함수는 다이내믹 인스턴스를 반환함과 동시에 Mesh의 0번 슬롯에 머티리얼을 즉시 적용합니다.
+		DynamicMaterial = MeshComponent->CreateDynamicMaterialInstance(0, GhostMaterialBase);
+	}
+
+	// 3. 데칼용 다이내믹 머티리얼 생성
+	if (GridDecalComp)
+	{
+		// 데칼에 이미 머티리얼이 할당되어 있는지 확인 후 생성
+		if (GridDecalComp->GetDecalMaterial())
 		{
-			DynamicMaterial = MeshComponent->CreateDynamicMaterialInstance(0, GhostMaterialBase);
+			DecalDynamicMaterial = GridDecalComp->CreateDynamicMaterialInstance();
 		}
 	}
 }

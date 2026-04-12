@@ -20,7 +20,7 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	void SetPreviewMesh(class UStaticMesh* NewMesh);
+	void CreateDynamicMaterial();
 	void SetValidPlacement(bool bIsValid);
 
 protected:
