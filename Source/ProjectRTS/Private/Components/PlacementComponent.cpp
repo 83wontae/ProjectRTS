@@ -3,6 +3,8 @@
 
 #include "Components/PlacementComponent.h"
 #include "Actors/PreviewBuilding.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
 
 // Sets default values for this component's properties
 UPlacementComponent::UPlacementComponent()
@@ -19,17 +21,24 @@ void UPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    if (bIsPlacementMode && PreviewActor)
+    if (!bIsPlacementMode) return; // 배치 모드가 아닐 때는 무시
+
+    AActor* Owner = GetOwner();
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+
+    if (Owner && PC)
     {
-        APlayerController* PC = Cast<APlayerController>(GetOwner());
         FHitResult Hit;
         if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
         {
+            // 1. 그리드 스냅 및 위치 업데이트 (AActor 기능만 사용)
             FVector SnappedLoc = SnapToGrid(Hit.Location);
-            PreviewActor->SetActorLocation(SnappedLoc);
+            Owner->SetActorLocation(SnappedLoc);
 
-            // 설치 가능 여부에 따라 고스트 색상 변경 (생략: 머티리얼 파라미터 조절)
+            // 2. 설치 가능 여부 상태만 업데이트
             bCanPlaceCurrent = CheckCanPlace(SnappedLoc);
+
+            // 더 이상 APreviewBuilding으로 Cast하여 함수를 호출하지 않습니다.
         }
     }
 }
@@ -38,39 +47,27 @@ void UPlacementComponent::StartPlacement(FName BuildingRowName)
 {
     // 1. 데이터 테이블에서 정보 로드 (생략)
 
-    // 2. 고스트 액터 스폰
-    FActorSpawnParameters SpawnParams;
-    PreviewActor = GetWorld()->SpawnActor<APreviewBuilding>(APreviewBuilding::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-
-    if (PreviewActor)
-    {
-        PreviewActor->SetPreviewMesh(CurrentBuildingData.PreviewMesh);
-        bIsPlacementMode = true;
-    }
+    bIsPlacementMode = true;
 }
 
 void UPlacementComponent::ConfirmPlacement()
 {
-    if (bIsPlacementMode && PreviewActor && bCanPlaceCurrent)
+    if (bCanPlaceCurrent && CurrentBuildingData.BuildingClass)
     {
-        // 3. 고스트 액터 위치에 실제 건물 스폰
-        FVector SpawnLoc = PreviewActor->GetActorLocation();
-        GetWorld()->SpawnActor<AActor>(CurrentBuildingData.BuildingClass, SpawnLoc, FRotator::ZeroRotator);
-
-        // 4. 고스트 제거 및 모드 종료
-        PreviewActor->Destroy();
-        PreviewActor = nullptr;
-        bIsPlacementMode = false;
+        GetWorld()->SpawnActor<AActor>(CurrentBuildingData.BuildingClass, GetOwner()->GetActorLocation(), FRotator::ZeroRotator);
+        GetOwner()->Destroy();
     }
 }
 
 FVector UPlacementComponent::SnapToGrid(FVector InLocation)
 {
-    // 타일 크기에 맞춰 좌표를 끊어줍니다.
-    float SnappedX = FMath::RoundToInt(InLocation.X / TileSize) * TileSize;
-    float SnappedY = FMath::RoundToInt(InLocation.Y / TileSize) * TileSize;
+    // FloorToFloat을 사용하면 0~99.9 사이의 모든 값은 0이 됩니다.
+    // 거기에 0.5(절반)를 더하면 해당 타일의 정중앙에 고정됩니다.
+    float SnappedX = FMath::FloorToFloat(InLocation.X / TileSize) * TileSize + (TileSize * 0.5f);
+    float SnappedY = FMath::FloorToFloat(InLocation.Y / TileSize) * TileSize + (TileSize * 0.5f);
 
-    // 건물의 Pivot 위치에 따라 Z값을 조정하거나 중심점을 맞춥니다.
+    // [팁] Z값은 지면 높이에 고정하는 것이 좋습니다. 
+    // 마우스가 유닛을 가리킬 때 건물이 공중에 뜨는 것을 방지합니다.
     return FVector(SnappedX, SnappedY, InLocation.Z);
 }
 

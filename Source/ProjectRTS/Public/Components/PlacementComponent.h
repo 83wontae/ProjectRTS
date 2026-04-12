@@ -27,6 +27,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
     void ConfirmPlacement();
 
+    UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
+    bool IsCanPlace() const { return bCanPlaceCurrent; }
+
 protected:
     UPROPERTY(EditAnywhere, Category = "RTS|Settings")
     float TileSize = 100.0f;

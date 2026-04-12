@@ -14,26 +14,40 @@ class PROJECTRTS_API APreviewBuilding : public AActor
 public:
 	APreviewBuilding();
 
-	/** 외형 메시 설정 */
-	void SetPreviewMesh(UStaticMesh* NewMesh);
+	virtual void Tick(float DeltaTime) override;
 
-	/** 설치 가능 여부에 따른 색상 변경 */
+protected:
+	virtual void BeginPlay() override;
+
+public:
+	void SetPreviewMesh(class UStaticMesh* NewMesh);
 	void SetValidPlacement(bool bIsValid);
 
 protected:
+	UPROPERTY(VisibleAnywhere, Category = "RTS")
+	class UPlacementComponent* PlacementComp;
+
 	UPROPERTY(VisibleAnywhere, Category = "Preview")
 	UStaticMeshComponent* MeshComponent;
 
-	/** 설치 가능/불가능 시 적용할 머티리얼 인스턴스 */
-	UPROPERTY(EditAnywhere, Category = "Preview")
-	UMaterialInterface* GhostMaterialBase;
+	// 바닥 그리드를 표시할 데칼 컴포넌트 추가
+	UPROPERTY(VisibleAnywhere, Category = "Preview")
+	class UDecalComponent* GridDecalComp;
 
+	UPROPERTY(EditAnywhere, Category = "Preview")
+	class UMaterialInterface* GhostMaterialBase;
+
+	// 고스트 메쉬용 다이내믹 머티리얼
 	UPROPERTY()
-	UMaterialInstanceDynamic* DynamicMaterial;
+	class UMaterialInstanceDynamic* DynamicMaterial;
+
+	// 데칼 그리드용 다이내믹 머티리얼
+	UPROPERTY()
+	class UMaterialInstanceDynamic* DecalDynamicMaterial;
 
 	UPROPERTY(EditAnywhere, Category = "Preview")
-	FLinearColor ValidColor = FLinearColor(0.0f, 1.0f, 0.0f, 0.5f); // 초록색
+	FLinearColor ValidColor = FLinearColor(0.0f, 1.0f, 0.0f, 0.5f);
 
 	UPROPERTY(EditAnywhere, Category = "Preview")
-	FLinearColor InvalidColor = FLinearColor(1.0f, 0.0f, 0.0f, 0.5f); // 빨간색
+	FLinearColor InvalidColor = FLinearColor(1.0f, 0.0f, 0.0f, 0.5f);
 };
