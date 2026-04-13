@@ -10,6 +10,53 @@
 #include "NavigationSystem.h" // 네비게이션 시스템 관련 기능을 위해 필요
 #include "Interface/UnitInterface.h" // 유닛 인터페이스 호출을 위해 필요
 #include "GameFramework/Character.h" // Character 캐스팅을 위해 필요
+#include "Core/RtsPlayer.h" // Pawn 참조
+#include "Global/ProjectRTSTypes.h" // ERtsInputMode 열거형 참조
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "Components/PlacementComponent.h"
+
+
+ARtsPlayerController::ARtsPlayerController():CurrentInputMode(ERtsInputMode::Tactical)
+{
+	PrimaryActorTick.bCanEverTick = true;
+}
+
+void ARtsPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 초기 모드 설정 (기본 IMC 추가)
+    SetRtsInputMode(ERtsInputMode::Tactical);
+}
+
+void ARtsPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+
+}
+
+void ARtsPlayerController::SetRtsInputMode(ERtsInputMode NewMode)
+{
+    auto* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+    if (!Subsystem) return;
+
+    // 일단 다 지우고 시작 (상태 초기화)
+    Subsystem->RemoveMappingContext(TacticalContext);
+    Subsystem->RemoveMappingContext(PlacementContext);
+
+    // 조건별 실행
+    if (NewMode == ERtsInputMode::Tactical && TacticalContext)
+    {
+        Subsystem->AddMappingContext(TacticalContext, 1);
+    }
+    else if (NewMode == ERtsInputMode::Placement && PlacementContext)
+    {
+        Subsystem->AddMappingContext(PlacementContext, 1);
+    }
+
+    CurrentInputMode = NewMode;
+}
 
 bool ARtsPlayerController::IsInSideDragRect(FVector LocationToTest, FVector2D Start, FVector2D End)
 {
@@ -68,6 +115,8 @@ void ARtsPlayerController::StartPlacementMode(FName BuildingRowName)
         // 3. 생성된 객체에 RowName을 전달 (그러면 PreviewBuilding이 스스로 초기화함)
         CurrentPreviewActor->SetupPreviewBuilding(BuildingRowName);
     }
+
+	SetRtsInputMode(ERtsInputMode::Placement);
 }
 
 void ARtsPlayerController::ClearCurrentPreview()
@@ -77,6 +126,21 @@ void ARtsPlayerController::ClearCurrentPreview()
         CurrentPreviewActor->Destroy();
         CurrentPreviewActor = nullptr; // 포인터 초기화 중요!
     }
+}
+
+void ARtsPlayerController::ConfirmPlacement()
+{
+    // 1. [가드 클로저] 프리뷰 액터가 없으면 즉시 종료
+    if (!CurrentPreviewActor) return;
+
+    // 2. [가드 클로저] 배치 컴포넌트가 없거나 설치 불가능한 상태면 종료
+    UPlacementComponent* PlacementComp = CurrentPreviewActor->FindComponentByClass<UPlacementComponent>();
+    if (!PlacementComp || !PlacementComp->IsCanPlace()) return;
+
+    PlacementComp->ConfirmPlacement();
+
+    ClearCurrentPreview();
+    SetRtsInputMode(ERtsInputMode::Tactical);
 }
 
 void ARtsPlayerController::UnSelectedAllUnits()

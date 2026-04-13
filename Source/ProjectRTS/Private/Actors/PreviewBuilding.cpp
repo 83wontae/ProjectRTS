@@ -37,7 +37,7 @@ void APreviewBuilding::BeginPlay()
 		{
 			// 2. [자연스러운 흐름] 데이터를 가져와서 액터가 직접 자기 메시를 바꿈
 			const FST_Building& Data = PlacementComp->GetCurrentBuildingData();
-			SetPreviewMesh(Data.PreviewMesh);
+			SetPreviewMesh(Data.BuildingMesh);
 
 			// 3. 준비가 끝났으니 컴포넌트의 배치 모드(Tick 이동 로직) 활성화
 			PlacementComp->ActivatePlacementMode();
@@ -60,7 +60,7 @@ void APreviewBuilding::SetupPreviewBuilding(FName InRowName)
 		{
 			// 4. 데이터를 가져와서 액터의 메시 설정
 			const FST_Building& Data = PlacementComp->GetCurrentBuildingData();
-			SetPreviewMesh(Data.PreviewMesh);
+			SetPreviewMesh(Data.BuildingMesh);
 
 			// 5. 배치 모드 활성화 (Tick 이동 시작)
 			PlacementComp->ActivatePlacementMode();

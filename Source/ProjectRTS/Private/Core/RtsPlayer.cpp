@@ -11,42 +11,39 @@ ARtsPlayer::ARtsPlayer()
 	PrimaryActorTick.bCanEverTick = true;
 }
 
+void ARtsPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		if (MoveAction)
+		{
+			// 자기 자신의 Move 함수에 직접 바인딩
+			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ARtsPlayer::Move);
+		}
+	}
+}
+
 void ARtsPlayer::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-// 1. Mapping Context 추가 (이미지의 'Add Input Mapping' 부분)
 void ARtsPlayer::PawnClientRestart()
 {
 	Super::PawnClientRestart();
 
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
-		{
-			if (DefaultMappingContext)
-			{
-				// 이미지와 동일하게 Priority 0으로 설정
-				Subsystem->AddMappingContext(DefaultMappingContext, 0);
-			}
-		}
-	}
-}
+	// 1. 컨트롤러가 없으면 더 볼 것도 없이 리턴
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
 
-// 2. 입력 바인딩
-void ARtsPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	// 2. 서브시스템이나 컨텍스트가 없으면 리턴
+	auto* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer());
+	if (!Subsystem || !GlobalNavContext) return;
 
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		if (MoveAction)
-		{
-			// Triggered 상태일 때 Move 함수 호출
-			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ARtsPlayer::Move);
-		}
-	}
+	// 3. 모든 가드를 통과했을 때만 로직 실행 (들여쓰기 깊이 0)
+	Subsystem->AddMappingContext(GlobalNavContext, 0);
 }
 
 // 3. 이동 로직 (이미지의 'Movement Input' 부분)
@@ -54,22 +51,13 @@ void ARtsPlayer::Move(const FInputActionValue& Value)
 {
 	// 벡터2D 값 추출 (X: Left/Right, Y: Forward/Backward)
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr)
+	if (MovementVector.Y != 0.0f)
 	{
-		// Forward/Backward 이동
-		if (MovementVector.Y != 0.0f)
-		{
-			FVector Direction = GetActorForwardVector();
-			AddActorWorldOffset(Direction * MovementVector.Y * MovementSpeed * GetWorld()->GetDeltaSeconds());
-		}
-
-		// Left/Right 이동
-		if (MovementVector.X != 0.0f)
-		{
-			FVector Direction = GetActorRightVector();
-			AddActorWorldOffset(Direction * MovementVector.X * MovementSpeed * GetWorld()->GetDeltaSeconds());
-		}
+		AddActorWorldOffset(GetActorForwardVector() * MovementVector.Y * MovementSpeed * GetWorld()->GetDeltaSeconds());
+	}
+	if (MovementVector.X != 0.0f)
+	{
+		AddActorWorldOffset(GetActorRightVector() * MovementVector.X * MovementSpeed * GetWorld()->GetDeltaSeconds());
 	}
 }
 

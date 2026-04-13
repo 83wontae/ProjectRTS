@@ -46,6 +46,9 @@ protected:
     UPROPERTY()
     APreviewBuilding* PreviewActor; // 현재 마우스를 따라다니는 고스트 건물
 
+    // 현재 배치 중인 건물의 데이터 테이블 행 이름 저장
+    FName CurrentRowName;
+
     FST_Building CurrentBuildingData;
     bool bIsPlacementMode = false;
 

@@ -218,14 +218,22 @@ struct FST_Building : public FTableRowBase
     FString Name;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
-    TSubclassOf<AActor> BuildingClass;
+    TSubclassOf<class ABuilding> BuildingClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
-    class UStaticMesh* PreviewMesh; // 건설 전 보여줄 고스트 메쉬
+    class UStaticMesh* BuildingMesh; // 건설 전 보여줄 고스트 메쉬
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
     int32 GridSizeX = 1; // 1x1, 2x2 등
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Building")
     int32 GridSizeY = 1;
+};
+
+// RTS 입력 상태 정의
+UENUM(BlueprintType)
+enum class ERtsInputMode : uint8
+{
+    Tactical,    // 유닛 지휘 모드
+    Placement    // 건물 배치 모드
 };

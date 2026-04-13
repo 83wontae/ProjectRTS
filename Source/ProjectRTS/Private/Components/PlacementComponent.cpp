@@ -5,6 +5,8 @@
 #include "Actors/PreviewBuilding.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
+#include "Actors/Building.h"
+#include "Core/RtsPlayerController.h"
 
 // Sets default values for this component's properties
 UPlacementComponent::UPlacementComponent()
@@ -51,6 +53,7 @@ bool UPlacementComponent::InitializePlacementData(FName BuildingRowName)
     if (FoundData)
     {
         CurrentBuildingData = *FoundData;
+        CurrentRowName = BuildingRowName;
         return true;
     }
     return false;
@@ -63,10 +66,26 @@ void UPlacementComponent::ActivatePlacementMode()
 
 void UPlacementComponent::ConfirmPlacement()
 {
-    if (bCanPlaceCurrent && CurrentBuildingData.BuildingClass)
+    // 1. [가드 클로저] 설치 불가능하거나 데이터가 유효하지 않으면 즉시 종료
+    if (!bCanPlaceCurrent || !CurrentBuildingData.BuildingClass) return;
+
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    // 2. [가드 클로저] 실제 건물 생성 시작 (Deferred Spawn 활용)
+    // 위치는 현재 고스트(Owner)의 위치를 사용합니다.
+    FTransform SpawnTransform(FRotator::ZeroRotator, GetOwner()->GetActorLocation());
+    ABuilding* NewBuilding = World->SpawnActorDeferred<ABuilding>(
+        CurrentBuildingData.BuildingClass,
+        SpawnTransform
+    );
+
+    if (NewBuilding)
     {
-        GetWorld()->SpawnActor<AActor>(CurrentBuildingData.BuildingClass, GetOwner()->GetActorLocation(), FRotator::ZeroRotator);
-        GetOwner()->Destroy();
+        // 3. 건물 액터가 생성 직후(BeginPlay 전)에 RowName을 전달합니다.
+        NewBuilding->BuildingRowName = CurrentRowName;
+        NewBuilding->FinishSpawning(SpawnTransform);
+		NewBuilding->InitializeBuilding(); // 데이터 테이블 기반 초기화 함수 호출 (ABuilding에서 구현)
     }
 }
 

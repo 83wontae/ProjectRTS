@@ -15,29 +15,35 @@ class PROJECTRTS_API ARtsPlayer : public APawn
 public:
 	ARtsPlayer();
 
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	// 컨트롤러에서 혹시 참조할 일이 있을 수 있으므로 public 혹은 Getter 제공
+	class UInputAction* GetMoveAction() const { return MoveAction; }
+
 protected:
 	virtual void BeginPlay() override;
 
-	// 블루프린트의 'ReceiveControllerChanged'와 유사한 역할을 하는 함수
 	virtual void PawnClientRestart() override;
+
+	/** IMC_Global_Nav: 카메라 이동 등 공용 입력 */
+	UPROPERTY(EditAnywhere, Category = "RTS|Input")
+	class UInputMappingContext* GlobalNavContext;
+
+	/** 2. 입력 액션 (에디터 할당) */
+	UPROPERTY(EditAnywhere, Category = "RTS|Input")
+	class UInputAction* MoveAction;
 
 public:
 	virtual void Tick(float DeltaTime) override;
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	/** 이동 처리 함수 */
+	void Move(const FInputActionValue& Value);
 
 protected:
-	/** 입력 설정 (에디터에서 할당) */
-	UPROPERTY(EditAnywhere, Category = "RTS|Input")
-	class UInputMappingContext* DefaultMappingContext;
-
-	UPROPERTY(EditAnywhere, Category = "RTS|Input")
-	class UInputAction* MoveAction;
 
 	/** 이동 속도 */
 	UPROPERTY(EditAnywhere, Category = "RTS|Movement")
 	float MovementSpeed = 100.0f;
 
-	/** 이동 처리 함수 */
-	void Move(const FInputActionValue& Value);
 
 };

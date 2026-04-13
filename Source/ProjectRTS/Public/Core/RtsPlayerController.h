@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "InputActionValue.h"
 #include "RtsPlayerController.generated.h"
 
 /**
@@ -14,6 +15,25 @@ class PROJECTRTS_API ARtsPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	
+public:
+	ARtsPlayerController();
+
+	/** 입력 모드 전환 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Input")
+	void SetRtsInputMode(ERtsInputMode NewMode);
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
+
+	/** IMC_Unit_Tactical: 유닛 지휘 입력 */
+	UPROPERTY(EditAnywhere, Category = "RTS|Input")
+	class UInputMappingContext* TacticalContext;
+
+	/** IMC_Build_Placement: 건물 배치 입력 */
+	UPROPERTY(EditAnywhere, Category = "RTS|Input")
+	class UInputMappingContext* PlacementContext;
+
 public:
 	UFUNCTION(BlueprintPure, Category = "RtsPlayerController")
 	bool IsInSideDragRect(FVector LocationToTest, FVector2D Start, FVector2D End);
@@ -33,6 +53,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
     void ClearCurrentPreview();
 
+	/** 배치 모드에서 클릭 시 호출될 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
+	void ConfirmPlacement();
+
 protected:
     // 배치할 고스트 건물의 베이스 클래스 (BP에서 할당)
     UPROPERTY(EditAnywhere, Category = "RTS|Settings")
@@ -45,6 +69,8 @@ protected:
 	/** 현재 선택된 유닛 액터들의 배열 */
 	UPROPERTY(BlueprintReadWrite, Category = "RTS|Selection")
 	TArray<AActor*> SelectedActors;
+
+	ERtsInputMode CurrentInputMode;
 
 public:
 	/** 모든 유닛의 선택을 해제하고 배열을 비우는 함수 */
