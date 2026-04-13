@@ -41,4 +41,25 @@ protected:
     // 현재 월드에 존재하는 고스트 객체 포인터
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Placement")
     class APreviewBuilding* CurrentPreviewActor;
+	
+	/** 현재 선택된 유닛 액터들의 배열 */
+	UPROPERTY(BlueprintReadWrite, Category = "RTS|Selection")
+	TArray<AActor*> SelectedActors;
+
+public:
+	/** 모든 유닛의 선택을 해제하고 배열을 비우는 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Selection")
+	void UnSelectedAllUnits();
+
+	/** 새로운 액터들을 선택 목록에 담는 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Selection")
+	void DoSelectUnits(const TArray<AActor*>& InActors);
+
+	/** 마우스 클릭 지점의 유닛 하나를 선택 목록에 추가하는 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Selection")
+	void DoSelectUnitSingle();
+
+	/** 선택된 유닛들을 목표 지점으로 이동시킴 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Movement")
+	void MoveUnits(FVector Goal);
 };
