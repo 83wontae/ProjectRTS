@@ -4,6 +4,7 @@
 #include "Core/RtsPlayerController.h"
 #include "Blueprint/WidgetLayoutLibrary.h" // 필수 헤더
 #include "Kismet/GameplayStatics.h"       // 필수 헤더
+#include "Actors/PreviewBuilding.h"        // 고스트 건물 클래스 헤더
 
 bool ARtsPlayerController::IsInSideDragRect(FVector LocationToTest, FVector2D Start, FVector2D End)
 {
@@ -43,5 +44,32 @@ void ARtsPlayerController::GetActorsInsideDragRect(TSubclassOf<UInterface> Targe
                 OutActors.Add(Actor);
             }
         }
+    }
+}
+
+void ARtsPlayerController::StartPlacementMode(FName BuildingRowName)
+{
+    // 1. 이미 다른 고스트가 있다면 제거 (중복 생성 방지)
+    ClearCurrentPreview();
+
+    if (!PreviewBuildingClass) return;
+
+    // 2. 고스트 스폰
+    FActorSpawnParameters SpawnParams;
+    CurrentPreviewActor = GetWorld()->SpawnActor<APreviewBuilding>(PreviewBuildingClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+    if (CurrentPreviewActor)
+    {
+        // 3. 생성된 객체에 RowName을 전달 (그러면 PreviewBuilding이 스스로 초기화함)
+        CurrentPreviewActor->SetupPreviewBuilding(BuildingRowName);
+    }
+}
+
+void ARtsPlayerController::ClearCurrentPreview()
+{
+    if (CurrentPreviewActor)
+    {
+        CurrentPreviewActor->Destroy();
+        CurrentPreviewActor = nullptr; // 포인터 초기화 중요!
     }
 }

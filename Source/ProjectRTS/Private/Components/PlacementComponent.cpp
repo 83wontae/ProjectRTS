@@ -43,10 +43,21 @@ void UPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
     }
 }
 
-void UPlacementComponent::StartPlacement(FName BuildingRowName)
+bool UPlacementComponent::InitializePlacementData(FName BuildingRowName)
 {
-    // 1. 데이터 테이블에서 정보 로드 (생략)
+    if (!BuildingDataTable) return false;
 
+    FST_Building* FoundData = BuildingDataTable->FindRow<FST_Building>(BuildingRowName, TEXT(""));
+    if (FoundData)
+    {
+        CurrentBuildingData = *FoundData;
+        return true;
+    }
+    return false;
+}
+
+void UPlacementComponent::ActivatePlacementMode()
+{
     bIsPlacementMode = true;
 }
 
@@ -61,14 +72,20 @@ void UPlacementComponent::ConfirmPlacement()
 
 FVector UPlacementComponent::SnapToGrid(FVector InLocation)
 {
-    // FloorToFloat을 사용하면 0~99.9 사이의 모든 값은 0이 됩니다.
-    // 거기에 0.5(절반)를 더하면 해당 타일의 정중앙에 고정됩니다.
-    float SnappedX = FMath::FloorToFloat(InLocation.X / TileSize) * TileSize + (TileSize * 0.5f);
-    float SnappedY = FMath::FloorToFloat(InLocation.Y / TileSize) * TileSize + (TileSize * 0.5f);
+    // 1. 데이터 테이블에서 가져온 건물 크기 (기본값 1)
+    int32 SizeX = CurrentBuildingData.GridSizeX > 0 ? CurrentBuildingData.GridSizeX : 1;
+    int32 SizeY = CurrentBuildingData.GridSizeY > 0 ? CurrentBuildingData.GridSizeY : 1;
 
-    // [팁] Z값은 지면 높이에 고정하는 것이 좋습니다. 
-    // 마우스가 유닛을 가리킬 때 건물이 공중에 뜨는 것을 방지합니다.
-    return FVector(SnappedX, SnappedY, InLocation.Z);
+    // 2. 기본 그리드 좌표 (Floor 기준)
+    float GridX = FMath::FloorToFloat(InLocation.X / TileSize) * TileSize;
+    float GridY = FMath::FloorToFloat(InLocation.Y / TileSize) * TileSize;
+
+    // 3. 짝수/홀수에 따른 오프셋 계산
+    // 홀수 크기: 타일 중앙(+50) / 짝수 크기: 격자 선(+0)
+    float OffsetX = (SizeX % 2 != 0) ? (TileSize * 0.5f) : 0.0f;
+    float OffsetY = (SizeY % 2 != 0) ? (TileSize * 0.5f) : 0.0f;
+
+    return FVector(GridX + OffsetX, GridY + OffsetY, InLocation.Z);
 }
 
 bool UPlacementComponent::CheckCanPlace(FVector InLocation)

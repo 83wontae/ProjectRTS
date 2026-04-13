@@ -28,12 +28,43 @@ APreviewBuilding::APreviewBuilding()
 void APreviewBuilding::BeginPlay()
 {
 	Super::BeginPlay();
+	CreateDynamicMaterial(); // 반투명 머티리얼 준비
 
+	if (PlacementComp && !BuildingRowName.IsNone())
+	{
+		// 1. 컴포넌트에게 데이터 테이블 정보를 찾아오라고 시킴
+		if (PlacementComp->InitializePlacementData(BuildingRowName))
+		{
+			// 2. [자연스러운 흐름] 데이터를 가져와서 액터가 직접 자기 메시를 바꿈
+			const FST_Building& Data = PlacementComp->GetCurrentBuildingData();
+			SetPreviewMesh(Data.PreviewMesh);
+
+			// 3. 준비가 끝났으니 컴포넌트의 배치 모드(Tick 이동 로직) 활성화
+			PlacementComp->ActivatePlacementMode();
+		}
+	}
+}
+
+void APreviewBuilding::SetupPreviewBuilding(FName InRowName)
+{
+	// 1. 전달받은 RowName 저장
+	BuildingRowName = InRowName;
+
+	// 2. 반투명 머티리얼 준비
 	CreateDynamicMaterial();
 
-	if (PlacementComp)
+	if (PlacementComp && !BuildingRowName.IsNone())
 	{
-		PlacementComp->StartPlacement(FName("DefaultBuilding"));
+		// 3. 컴포넌트에게 데이터 테이블 정보 로드 요청
+		if (PlacementComp->InitializePlacementData(BuildingRowName))
+		{
+			// 4. 데이터를 가져와서 액터의 메시 설정
+			const FST_Building& Data = PlacementComp->GetCurrentBuildingData();
+			SetPreviewMesh(Data.PreviewMesh);
+
+			// 5. 배치 모드 활성화 (Tick 이동 시작)
+			PlacementComp->ActivatePlacementMode();
+		}
 	}
 }
 
@@ -47,6 +78,27 @@ void APreviewBuilding::Tick(float DeltaTime)
 		bool bValid = PlacementComp->IsCanPlace();
 		// 2. [수정] 가져온 결과에 따라 외형과 데칼 색상을 업데이트함
 		SetValidPlacement(bValid);
+	}
+}
+
+void APreviewBuilding::SetPreviewMesh(UStaticMesh* NewMesh)
+{
+	if (MeshComponent && NewMesh)
+	{
+		// 1. 새로운 스태틱 메시 적용
+		MeshComponent->SetStaticMesh(NewMesh);
+
+		// 2. 메쉬가 변경되었으므로 고스트 머티리얼(홀로그램)을 다시 생성하여 입힘
+		// 이 함수 내부에서 GhostMaterialBase를 사용하여 DynamicMaterial을 만들고 적용합니다.
+		CreateDynamicMaterial();
+
+		// 3. (옵션) 기존에 설정된 색상 상태(Valid/Invalid)가 있다면 유지하도록 처리
+		// PlacementComp가 있다면 다음 Tick에서 자동으로 업데이트되겠지만, 
+		// 즉각적인 반응을 위해 아래와 같이 호출할 수 있습니다.
+		if (PlacementComp)
+		{
+			SetValidPlacement(PlacementComp->IsCanPlace());
+		}
 	}
 }
 

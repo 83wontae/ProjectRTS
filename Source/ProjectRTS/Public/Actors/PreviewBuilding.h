@@ -20,8 +20,20 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
+	/** 초기화 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Preview")
+	void SetupPreviewBuilding(FName InRowName);
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Preview")
+	void SetPreviewMesh(class UStaticMesh* NewMesh);
+
 	void CreateDynamicMaterial();
 	void SetValidPlacement(bool bIsValid);
+
+public:
+	// meta = (ExposeOnSpawn = true)를 추가하여 스폰 노드에서 바로 보이게 합니다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS", meta = (ExposeOnSpawn = true))
+	FName BuildingRowName;
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "RTS")

@@ -19,9 +19,14 @@ public:
 
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+    // 데이터를 외부(액터)에서 가져갈 수 있도록 Getter 추가
+    const FST_Building& GetCurrentBuildingData() const { return CurrentBuildingData; }
+
+    // 데이터 로드만 담당하는 함수로 변경
+    bool InitializePlacementData(FName BuildingRowName);
+
     /** 배치 모드 시작 */
-    UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
-    void StartPlacement(FName BuildingRowName);
+    void ActivatePlacementMode();
 
     /** 배치 확정 (클릭 시) */
     UFUNCTION(BlueprintCallable, Category = "RTS|Placement")
@@ -31,6 +36,10 @@ public:
     bool IsCanPlace() const { return bCanPlaceCurrent; }
 
 protected:
+    // 에디터에서 할당할 건물 데이터 테이블
+    UPROPERTY(EditAnywhere, Category = "RTS|Settings")
+    class UDataTable* BuildingDataTable;
+
     UPROPERTY(EditAnywhere, Category = "RTS|Settings")
     float TileSize = 100.0f;
 
