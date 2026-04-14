@@ -22,26 +22,17 @@ UPlacementComponent::UPlacementComponent()
 void UPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    if (!bIsPlacementMode) return;
 
-    if (!bIsPlacementMode) return; // 배치 모드가 아닐 때는 무시
-
-    AActor* Owner = GetOwner();
     APlayerController* PC = GetWorld()->GetFirstPlayerController();
-
-    if (Owner && PC)
+    FHitResult Hit;
+    if (PC && PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
     {
-        FHitResult Hit;
-        if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
-        {
-            // 1. 그리드 스냅 및 위치 업데이트 (AActor 기능만 사용)
-            FVector SnappedLoc = SnapToGrid(Hit.Location);
-            Owner->SetActorLocation(SnappedLoc);
+        FVector SnappedLoc = SnapToGrid(Hit.Location);
+        GetOwner()->SetActorLocation(SnappedLoc);
 
-            // 2. 설치 가능 여부 상태만 업데이트
-            bCanPlaceCurrent = CheckCanPlace(SnappedLoc);
-
-            // 더 이상 APreviewBuilding으로 Cast하여 함수를 호출하지 않습니다.
-        }
+        // 결과값만 저장
+        bCanPlaceCurrent = CheckCanPlace(SnappedLoc);
     }
 }
 
@@ -109,8 +100,23 @@ FVector UPlacementComponent::SnapToGrid(FVector InLocation)
 
 bool UPlacementComponent::CheckCanPlace(FVector InLocation)
 {
-    // 1. 해당 위치에 다른 액터가 있는지 Overlap 체크
-    // 2. 지형이 너무 가파르지 않은지 체크
-    // 3. GameState의 점유 그리드 맵 확인
+    // 1. [가드 클로저] 메쉬 컴포넌트가 없으면 기본적으로 true 반환
+    UStaticMeshComponent* MeshComp = GetOwner()->FindComponentByClass<UStaticMeshComponent>();
+    if (!MeshComp) return true;
+
+    // 2. Overlap 체크: 현재 메쉬와 겹치는 액터들을 가져옴
+    TArray<AActor*> OverlappingActors;
+    MeshComp->GetOverlappingActors(OverlappingActors);
+
+    for (AActor* Actor : OverlappingActors)
+    {
+        // 3. [가드 클로저] 자기 자신이나 바닥(Static Mesh Actor 등)이 아닌 다른 액터가 있으면 설치 불가
+        // 특정 클래스(예: ATerrain)만 제외하도록 필터링을 강화할 수 있습니다.
+        if (Actor && Actor != GetOwner())
+        {
+            return false;
+        }
+    }
+
     return true;
 }

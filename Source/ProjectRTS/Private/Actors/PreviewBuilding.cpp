@@ -12,6 +12,7 @@ APreviewBuilding::APreviewBuilding()
 	RootComponent = MeshComponent;
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->SetCastShadow(false);
+	MeshComponent->SetGenerateOverlapEvents(true);
 
 	// 데칼 컴포넌트 생성 및 초기화
 	GridDecalComp = CreateDefaultSubobject<UDecalComponent>(TEXT("GridDecal"));
@@ -83,23 +84,29 @@ void APreviewBuilding::Tick(float DeltaTime)
 
 void APreviewBuilding::SetPreviewMesh(UStaticMesh* NewMesh)
 {
-	if (MeshComponent && NewMesh)
+	if (!MeshComponent || !NewMesh) return;
+
+	// 1. 메쉬 설정 및 충돌 설정 (중요: GenerateOverlapEvents를 켜야 감지가 됩니다)
+	MeshComponent->SetStaticMesh(NewMesh);
+	MeshComponent->SetCollisionProfileName(TEXT("OverlapAll"));
+
+	// 2. 데칼 크기 조정 (Radii가 아닌 전체 크기 기준)
+	if (GridDecalComp)
 	{
-		// 1. 새로운 스태틱 메시 적용
-		MeshComponent->SetStaticMesh(NewMesh);
+		const FST_Building& Data = PlacementComp->GetCurrentBuildingData();
 
-		// 2. 메쉬가 변경되었으므로 고스트 머티리얼(홀로그램)을 다시 생성하여 입힘
-		// 이 함수 내부에서 GhostMaterialBase를 사용하여 DynamicMaterial을 만들고 적용합니다.
-		CreateDynamicMaterial();
+		// 타일당 100유닛일 때, GridSize가 1이면 전체 크기는 100.0f가 되어야 합니다.
+		// 0.5f를 곱하면 타일의 절반만 덮게 되어 그리드 선이 안 보일 수 있습니다.
+		float DecalDefaultSize = 1000.0f;
+		float NewSizeX = (DecalDefaultSize + Data.GridSizeX * 100.0f);
+		float NewSizeY = (DecalDefaultSize + Data.GridSizeY * 100.0f);
 
-		// 3. (옵션) 기존에 설정된 색상 상태(Valid/Invalid)가 있다면 유지하도록 처리
-		// PlacementComp가 있다면 다음 Tick에서 자동으로 업데이트되겠지만, 
-		// 즉각적인 반응을 위해 아래와 같이 호출할 수 있습니다.
-		if (PlacementComp)
-		{
-			SetValidPlacement(PlacementComp->IsCanPlace());
-		}
+		// X=투영깊이(200), Y=가로(NewSizeX), Z=세로(NewSizeY)
+		GridDecalComp->DecalSize = FVector(200.0f, NewSizeX, NewSizeY);
 	}
+
+	// 3. 머티리얼 재생성 및 초기화
+	CreateDynamicMaterial();
 }
 
 void APreviewBuilding::SetValidPlacement(bool bIsValid)
@@ -133,12 +140,9 @@ void APreviewBuilding::CreateDynamicMaterial()
 	}
 
 	// 3. 데칼용 다이내믹 머티리얼 생성
-	if (GridDecalComp)
+	if (GridDecalComp && GridDecalComp->GetDecalMaterial())
 	{
-		// 데칼에 이미 머티리얼이 할당되어 있는지 확인 후 생성
-		if (GridDecalComp->GetDecalMaterial())
-		{
-			DecalDynamicMaterial = GridDecalComp->CreateDynamicMaterialInstance();
-		}
+		// 부모 머티리얼로부터 다이내믹 인스턴스를 생성하여 캐싱합니다.
+		DecalDynamicMaterial = GridDecalComp->CreateDynamicMaterialInstance();
 	}
 }
