@@ -25,14 +25,28 @@ void UPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
     if (!bIsPlacementMode) return;
 
     APlayerController* PC = GetWorld()->GetFirstPlayerController();
-    FHitResult Hit;
-    if (PC && PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
-    {
-        FVector SnappedLoc = SnapToGrid(Hit.Location);
-        GetOwner()->SetActorLocation(SnappedLoc);
+    FVector WorldLoc, WorldDir;
 
-        // 결과값만 저장
-        bCanPlaceCurrent = CheckCanPlace(SnappedLoc);
+    if (PC && PC->DeprojectMousePositionToWorld(WorldLoc, WorldDir))
+    {
+        FVector TraceEnd = WorldLoc + (WorldDir * 100000.0f);
+        FHitResult Hit;
+
+        // 1. [중요] 오직 'Ground' 오브젝트 타입만 찾습니다. (건물 무시)
+        FCollisionObjectQueryParams ObjectParams;
+        ObjectParams.AddObjectTypesToQuery(ECC_GameTraceChannel1); // Ground 채널
+
+        if (GetWorld()->LineTraceSingleByObjectType(Hit, WorldLoc, TraceEnd, ObjectParams))
+        {
+            // 2. 마우스가 찍은 바닥 좌표를 그리드에 맞게 보정 (중앙 정렬 포함)
+            FVector SnappedLoc = SnapToGrid(Hit.Location);
+
+            // 3. 고스트 건물을 마우스 위치(보정됨)로 이동
+            GetOwner()->SetActorLocation(SnappedLoc);
+
+            // 4. 설치 가능 여부 체크 (Overlap은 여전히 작동하여 빨간색 표시)
+            bCanPlaceCurrent = CheckCanPlace(SnappedLoc);
+        }
     }
 }
 
@@ -95,7 +109,8 @@ FVector UPlacementComponent::SnapToGrid(FVector InLocation)
     float OffsetX = (SizeX % 2 != 0) ? (TileSize * 0.5f) : 0.0f;
     float OffsetY = (SizeY % 2 != 0) ? (TileSize * 0.5f) : 0.0f;
 
-    return FVector(GridX + OffsetX, GridY + OffsetY, InLocation.Z);
+    // 최종 좌표 (Z값은 바닥에서 살짝 띄워주면 데칼 깜빡임 방지에 좋습니다)
+    return FVector(GridX + OffsetX, GridY + OffsetY, InLocation.Z + 2.0f);
 }
 
 bool UPlacementComponent::CheckCanPlace(FVector InLocation)

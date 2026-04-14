@@ -12,6 +12,8 @@ ABuilding::ABuilding()
     // 메시 컴포넌트 생성 및 루트 설정
     MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BuildingMesh"));
     RootComponent = MeshComponent;
+
+    MeshComponent->SetCollisionProfileName(TEXT("Building"));
 }
 
 void ABuilding::BeginPlay()

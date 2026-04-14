@@ -10,7 +10,6 @@ APreviewBuilding::APreviewBuilding()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->SetCastShadow(false);
 	MeshComponent->SetGenerateOverlapEvents(true);
 
