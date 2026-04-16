@@ -6,6 +6,8 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Interface/UnitInterface.h"
 #include "Core/RtsGameState.h"
+#include "Components/StateComponent.h"
+#include "Components/EquipComponent.h"
 
 USkillComponent::USkillComponent()
 {
@@ -139,6 +141,9 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 	{
 		if (SkillData->SkillAnim)
 		{
+			// 현재 실행 중인 스킬 이름 저장
+			CurrentActiveSkillName = SkillName;
+
 			// 타겟 방향 회전
 			if (InTarget)
 			{
@@ -226,6 +231,83 @@ void USkillComponent::ClearSkills()
 {
 	m_SkillMap.Empty();
 	m_CooldownMap.Empty();
+}
+
+void USkillComponent::ExecuteSkillEffect()
+{
+	// 1. [가드 클로저] 데이터 유효성 검사
+	if (!OwnerChar || CurrentActiveSkillName.IsNone()) return;
+
+	const FST_Skill* SkillData = m_SkillMap.Find(CurrentActiveSkillName);
+	if (!SkillData) return;
+
+	// 2. 타겟 정보 가져오기 (StateComponent의 어그로 타겟 활용)
+	UStateComponent* StateComp = OwnerChar->FindComponentByClass<UStateComponent>();
+	AActor* Target = StateComp ? StateComp->GetAggroTarget() : nullptr;
+
+	// 3. 스킬 타입에 따른 분기 처리 (FST_Skill에 bIsRanged나 SkillType이 있다고 가정)
+	if (SkillData->SkillType == ESkillType::Projectile)
+	{
+		// 1. 장착된 무기에서 머즐 위치 정보만 가져오기
+		UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
+		// 주력 무기(오른손) 소켓 이름을 가져옴
+		FName MuzzleName = EquipComp ? EquipComp->GetMuzzleSocketName(EWeaponSlot::RightHand) : TEXT("Muzzle");
+
+		// --- 원거리: 발사체 생성 ---
+		SpawnProjectile(SkillData, Target, MuzzleName);
+	}
+	else
+	{
+		// --- 근접: 즉시 히트 처리 ---
+		ProcessMeleeHit(SkillData, Target);
+	}
+}
+
+void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FName MuzzleName)
+{
+	if (!SkillData->ProjectileClass || !OwnerChar) return;
+
+	// 5. 무기에 설정된 소켓 위치를 찾습니다.
+	// 무기는 캐릭터의 Mesh에 붙어있으므로 Mesh에서 소켓 위치를 찾으면 됩니다.
+	FVector SpawnLocation = OwnerChar->GetMesh()->GetSocketLocation(MuzzleName);
+	FRotator SpawnRotation = OwnerChar->GetActorRotation();
+
+	if (Target)
+	{
+		SpawnRotation = (Target->GetActorLocation() - SpawnLocation).Rotation();
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = OwnerChar;
+	SpawnParams.Instigator = OwnerChar;
+
+	// 발사체 스폰 (Deferred Spawn 권장)
+	// 발사체 클래스 내부에서 타겟 정보와 데미지를 받아 처리하도록 설계합니다.
+	AActor* Projectile = GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
+
+	// Projectile->Initialize(Target, TotalDamage); // 발사체 초기화 로직 (클래스에 따라 구현)
+}
+
+void USkillComponent::ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target)
+{
+	// [가드 클로저] 타겟이 없거나 이미 죽었으면 무시
+	if (!Target || IUnitInterface::Execute_IsDeath(Target)) return;
+
+	// 사거리 재확인 (애니메이션 도중 적이 도망갔을 경우 대비)
+	if (!IsCanAttack(Target)) return;
+
+
+	// 상대방 StateComponent에 데미지 전달
+	UStateComponent* TargetState = Target->FindComponentByClass<UStateComponent>();
+
+	// 데미지 계산 (유닛 기본 공격력 * 스킬 계수)
+	float BaseDamage = TargetState->GetAttackPower(); // 유닛의 기본 공격력 (StateComponent에서 가져온다고 가정)
+
+	if (TargetState)
+	{
+		TargetState->AddDamage(BaseDamage);
+		UE_LOG(LogTemp, Log, TEXT("[%s] Melee Hit on [%s]: %f Damage"), *OwnerChar->GetName(), *Target->GetName(), BaseDamage);
+	}
 }
 
 void USkillComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)

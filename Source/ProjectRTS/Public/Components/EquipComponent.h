@@ -84,6 +84,10 @@ public:
 	void UpdateBattleAnimType();
 
 public:
+	/** 특정 슬롯에 장착된 무기의 머즐 소켓 이름을 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	FName GetMuzzleSocketName(EWeaponSlot Slot) const;
+
 	UPROPERTY(ReplicatedUsing = OnRep_UnitRowName, BlueprintReadWrite, Category = "RTS|Equip")
 	FName m_UnitRowName;
 

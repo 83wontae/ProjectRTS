@@ -22,6 +22,7 @@ void UStateComponent::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerChar = Cast<ACharacter>(GetOwner());
+
 	m_CurHp = m_MaxHp; // 초기 체력 설정
 }
 

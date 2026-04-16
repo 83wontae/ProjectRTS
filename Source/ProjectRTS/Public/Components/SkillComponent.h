@@ -49,6 +49,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void ClearSkills();
 
+	/** 블루프린트 AnimNotify_SkillHit 등에서 호출할 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
+	void ExecuteSkillEffect();
+
+	void ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target);
+
+	void SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FName MuzzleName);
+
 protected:
 	/** 공격 종료 시 상태 초기화를 위한 콜백 */
 	UFUNCTION()
@@ -62,6 +70,9 @@ private:
 	TMap<FName, FST_Skill> m_SkillMap;
 
 	TMap<FName, float> m_CooldownMap;
+
+	/** 현재 실행 중인 스킬의 이름을 저장 (Notify 시 데이터 참조용) */
+	FName CurrentActiveSkillName;
 
 protected:
 	/** 스킬 정보를 참조할 데이터 테이블 */

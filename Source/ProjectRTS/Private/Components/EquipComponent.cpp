@@ -234,6 +234,27 @@ void UEquipComponent::UpdateBattleAnimType()
 	}
 }
 
+FName UEquipComponent::GetMuzzleSocketName(EWeaponSlot Slot) const
+{
+	// 1. [가드 클로저] 데이터 테이블 유효성 확인
+	if (!WeaponTable) return TEXT("Muzzle");
+
+	// 2. 슬롯에 따른 무기 이름 결정
+	FName TargetWeaponName = (Slot == EWeaponSlot::RightHand) ? m_RightWeaponName : m_LeftWeaponName;
+
+	// 3. [가드 클로저] 무기가 장착되어 있지 않으면 기본값 반환
+	if (TargetWeaponName.IsNone()) return TEXT("Muzzle");
+
+	// 4. 데이터 테이블 조회 및 소켓 이름 반환
+	FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(TargetWeaponName, TEXT(""));
+	if (WeaponData && !WeaponData->MuzzleSocketName.IsNone())
+	{
+		return WeaponData->MuzzleSocketName;
+	}
+
+	return TEXT("Muzzle");
+}
+
 FName UEquipComponent::GetTargetSocketName(const FST_Weapon& WeaponData, EWeaponSlot RequestedSlot) const
 {
 	// 1. 우선적으로 무기 유형이 Shield인지 확인합니다.

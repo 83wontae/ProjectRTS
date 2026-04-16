@@ -34,14 +34,6 @@ protected:
 	UPROPERTY(BlueprintReadWrite, Category = "Weapon|Data")
 	FName WeaponRowName;
 
-	/** 스폰할 발사체 클래스 */
-	UPROPERTY(EditAnywhere, Category = "Weapon|Data")
-	TSubclassOf<AActor> ProjectileClass;
-
-	/** 발사체가 생성될 소켓 이름 */
-	UPROPERTY(EditAnywhere, Category = "Weapon|Data")
-	FName MuzzleSocketName = TEXT("MuzzleSocket");
-
 public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void InitializeWeapon(UDataTable* InTable, FName InRowName);

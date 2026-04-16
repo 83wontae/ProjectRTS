@@ -50,6 +50,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     AActor* GetAggroTarget() const { return m_AggroTarget.Get(); }
 
+    /** 유닛의 현재 공격력을 반환합니다. */
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetAttackPower() const { return 10.0f; }
+
 protected:
     /** 사망 시 처리 로직 **/
     void HandleDeath();

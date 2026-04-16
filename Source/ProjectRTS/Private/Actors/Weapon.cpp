@@ -128,23 +128,25 @@ bool AWeapon::IsCharRiding() const
 
 void AWeapon::FireProjectile()
 {
-	if (!ProjectileClass || !WeaponMesh) return;
+	// 1. 현재 무기 데이터를 구조체로부터 가져옵니다.
+	FST_Weapon Data = GetWeaponData_Implementation();
 
-	// 1. 발사 위치 및 회전 설정 (범용 소켓 이름 사용)
-	const FVector SpawnLocation = WeaponMesh->GetSocketLocation(MuzzleSocketName);
-	const FRotator SpawnRotation = WeaponMesh->GetSocketRotation(MuzzleSocketName);
+	// 2. [가드 클로저] 데이터가 유효하지 않거나 메시가 없으면 즉시 종료
+	if (!Data.ProjectileClass || !WeaponMesh) return;
 
-	// 2. 스폰 설정 (Owner와 Instigator를 설정해야 대미지 처리가 정확해집니다)
+	// 3. 구조체에 정의된 소켓 이름을 사용하여 위치와 회전을 결정합니다.
+	const FVector SpawnLocation = WeaponMesh->GetSocketLocation(Data.MuzzleSocketName);
+	const FRotator SpawnRotation = WeaponMesh->GetSocketRotation(Data.MuzzleSocketName);
+
+	// 4. 스폰 설정
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = GetOwner(); // 무기 주인 (Character)
+	SpawnParams.Owner = GetOwner();
 	SpawnParams.Instigator = Cast<APawn>(GetOwner());
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// 3. 발사체 액터 생성
-	// 여기서 스폰만 해주면, 발사체 액터 내부의 ProjectileMovementComponent가 
-	// BeginPlay 시점에 SpawnRotation 방향으로 날아가기 시작합니다.
+	// 5. 구조체에 등록된 클래스로 발사체 생성
 	AActor* SpawnedProjectile = GetWorld()->SpawnActor<AActor>(
-		ProjectileClass,
+		Data.ProjectileClass,
 		SpawnLocation,
 		SpawnRotation,
 		SpawnParams
@@ -152,9 +154,7 @@ void AWeapon::FireProjectile()
 
 	if (SpawnedProjectile)
 	{
-		// [필요 시] 발사체에게 추가 정보 전달 (예: 공격력 수치)
-		// IProjectileInterface* ProjectileInt = Cast<IProjectileInterface>(SpawnedProjectile);
-		// if (ProjectileInt) { ProjectileInt->Setup(GetWeaponData().AttackPower); }
+		UE_LOG(LogTemp, Log, TEXT("[%s] Fired Projectile: %s"), *GetName(), *Data.ProjectileClass->GetName());
 	}
 }
 

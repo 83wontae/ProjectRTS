@@ -109,8 +109,20 @@ struct FST_Weapon : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     EWeaponType WeaponType;
 
+    /** 이 무기를 장착했을 때 추가될 기본 스킬 이름 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    FName DefaultSkillName;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     EWeaponHandConstraint HandConstraint;
+
+    /** 스폰할 발사체 클래스 (원거리 무기일 경우) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    TSubclassOf<AActor> ProjectileClass;
+
+    /** 발사체가 생성될 무기의 소켓 이름 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    FName MuzzleSocketName = TEXT("MuzzleSocket");
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     class UStaticMesh* StaticMesh;
@@ -184,6 +196,16 @@ struct FST_Unit : public FTableRowBase
     float DetectionRange;
 };
 
+/** 스킬의 구체적인 유형 */
+UENUM(BlueprintType)
+enum class ESkillType : uint8
+{
+    Melee,      // 근접 타격
+    Projectile, // 발사체 발사
+    Buff,       // 자기 자신 또는 아군 버프
+    Area        // 범위 공격
+};
+
 /** 스킬 데이터 구조체 (DataTable용) */
 USTRUCT(BlueprintType)
 struct FST_Skill : public FTableRowBase
@@ -192,6 +214,13 @@ struct FST_Skill : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
     FString Name;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
+    ESkillType SkillType;
+
+    /** 발사체 스킬일 경우 사용할 클래스 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (EditCondition = "SkillType == ESkillType::Projectile"))
+    TSubclassOf<AActor> ProjectileClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
     class UTexture2D* Icon;
