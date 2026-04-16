@@ -56,6 +56,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void EquipToUnitData(FName InUnitRowName);
 
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void UpdateTotalEquipStats();
+
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	bool IsRideState() const { return !m_ArmorHorseName.IsNone(); }
 

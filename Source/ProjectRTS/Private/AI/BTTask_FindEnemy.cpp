@@ -5,6 +5,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/SkillComponent.h"
+#include "Components/StateComponent.h"
 
 UBTTask_FindEnemy::UBTTask_FindEnemy()
 {
@@ -30,11 +31,16 @@ EBTNodeResult::Type UBTTask_FindEnemy::ExecuteTask(UBehaviorTreeComponent& Owner
 	{
 		// 3. 블랙보드 키에 타겟 저장
 		UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
-		if (BB)
-		{
-			BB->SetValueAsObject(TargetActorKey.SelectedKeyName, FoundTarget);
-			return EBTNodeResult::Succeeded;
-		}
+		if (BB == nullptr)
+			return EBTNodeResult::Failed;
+
+		UStateComponent* StateComp = Pawn->FindComponentByClass<UStateComponent>();
+		if (StateComp == nullptr)
+			return EBTNodeResult::Failed;
+
+		BB->SetValueAsObject(TargetActorKey.SelectedKeyName, FoundTarget);
+		StateComp->SetAggroTarget(FoundTarget);
+		return EBTNodeResult::Succeeded;
 	}
 
 	return EBTNodeResult::Failed;

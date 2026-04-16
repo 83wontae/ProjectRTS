@@ -196,6 +196,36 @@ struct FST_Unit : public FTableRowBase
     float DetectionRange;
 };
 
+/** 유닛의 종합 스탯 구조체 */
+USTRUCT(BlueprintType)
+struct FST_UnitStats
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double Attack = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double MaxHp = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double Defend = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double Speed = 0.0;
+
+    // 더하기 연산자 오버로딩 (Base + Equip 연산을 편리하게 하기 위함)
+    FST_UnitStats operator+(const FST_UnitStats& Other) const
+    {
+        FST_UnitStats Result;
+        Result.Attack = Attack + Other.Attack;
+        Result.MaxHp = MaxHp + Other.MaxHp;
+        Result.Defend = Defend + Other.Defend;
+        Result.Speed = Speed + Other.Speed;
+        return Result;
+    }
+};
+
 /** 스킬의 구체적인 유형 */
 UENUM(BlueprintType)
 enum class ESkillType : uint8

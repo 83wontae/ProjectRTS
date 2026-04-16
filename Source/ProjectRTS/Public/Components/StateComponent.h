@@ -26,6 +26,39 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
+    /** 최종 스탯 전체를 반환 */
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    FST_UnitStats GetTotalStats() const { return m_TotalStats; }
+
+    /** 유닛의 현재 체력 최대치를 반환합니다. */
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetMaxHp() const { return m_TotalStats.MaxHp; }
+
+    /** 유닛의 현재 공격력을 반환합니다. */
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetAttackPower() const { return m_TotalStats.Attack; }
+
+    /** 기초 스탯 설정 */
+    void SetBaseStats(const FST_Unit& UnitData);
+
+    /** 장비 추가 스탯 설정 */
+    void SetEquipStats(const FST_UnitStats& NewEquipStats);
+
+private:
+    /** 최종 수치 재계산 */
+    void RecalculateTotalStats();
+
+private:
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_UnitStats m_BaseStats;  // 기초 (Unit Data)
+
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_UnitStats m_EquipStats; // 장비 보너스
+
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_UnitStats m_TotalStats; // 최종 합산 (Base + Equip)
+
+public:
     /** 데미지를 입히는 함수 */
     UFUNCTION(BlueprintCallable, Category = "RTS|State")
     void AddDamage(double Damage);
@@ -50,10 +83,6 @@ public:
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     AActor* GetAggroTarget() const { return m_AggroTarget.Get(); }
 
-    /** 유닛의 현재 공격력을 반환합니다. */
-    UFUNCTION(BlueprintPure, Category = "RTS|State")
-    double GetAttackPower() const { return 10.0f; }
-
 protected:
     /** 사망 시 처리 로직 **/
     void HandleDeath();
@@ -64,9 +93,6 @@ protected:
 public:
     UPROPERTY(ReplicatedUsing = OnRep_CurHp, BlueprintReadWrite, Category = "RTS|State")
     double m_CurHp;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|State")
-    double m_MaxHp = 100.0;
 
     // --- 팀 시스템 변수 및 함수 ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")

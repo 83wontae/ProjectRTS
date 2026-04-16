@@ -4,6 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Actors/Weapon.h"
+#include "Components/StateComponent.h"
 
 // Sets default values for this component's properties
 UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
@@ -103,6 +104,7 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 		OnRep_LeftWeaponName();
 	}
 	UpdateBattleAnimType();
+	UpdateTotalEquipStats();
 }
 
 void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
@@ -116,6 +118,8 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 	case EEquipType::Horse: m_ArmorHorseName = ArmorName; break;
 	default: break;
 	}
+
+	UpdateTotalEquipStats();
 }
 
 void UEquipComponent::EquipToUnitData(FName InUnitRowName)
@@ -124,6 +128,43 @@ void UEquipComponent::EquipToUnitData(FName InUnitRowName)
 
 	m_UnitRowName = InUnitRowName;
 	OnRep_UnitRowName(); // 서버에서도 비주얼 업데이트 실행
+}
+
+void UEquipComponent::UpdateTotalEquipStats()
+{
+	UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
+	if (!StateComp) return;
+
+	// 1. [Safety] 유닛 기본 데이터(Base)부터 다시 로드해서 State에 던져줍니다.
+	// m_UnitRowName을 기준으로 항상 최신 베이스 스탯을 보장합니다.
+	if (UnitTable && !m_UnitRowName.IsNone())
+	{
+		if (const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT("")))
+		{
+			StateComp->SetBaseStats(*UnitData);
+		}
+	}
+
+	// 2. 장비 추가 스탯(Equip) 계산 시작
+	FST_UnitStats NewEquipStats;
+
+	// 오른손 무기 공격력 합산
+	if (WeaponTable && !m_RightWeaponName.IsNone())
+	{
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("")))
+			NewEquipStats.Attack += Data->AttackPower;
+	}
+
+	// 왼손 무기 공격력 합산
+	if (WeaponTable && !m_LeftWeaponName.IsNone())
+	{
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("")))
+			NewEquipStats.Attack += Data->AttackPower;
+	}
+
+	// 3. 최종적으로 계산된 장비 보너스를 State에 주입
+	// StateComponent 내부에서 자동으로 RecalculateTotalStats()가 실행됩니다.
+	StateComp->SetEquipStats(NewEquipStats);
 }
 
 const FST_Unit* UEquipComponent::GetUnitData(FName InRowName) const
@@ -139,7 +180,10 @@ void UEquipComponent::OnRep_UnitRowName()
 	const FST_Unit* Data = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
 	if (Data)
 	{
-		// 핵심: 직접 메쉬를 바꾸지 않고 데이터만 던집니다.
+		// 모든 스탯 계산은 이 함수가 책임집니다.
+		UpdateTotalEquipStats();
+
+		// 비주얼(메쉬) 업데이트만 수행
 		OnUpdateUnitBody.Broadcast(*Data);
 	}
 }

@@ -241,11 +241,21 @@ void USkillComponent::ExecuteSkillEffect()
 	const FST_Skill* SkillData = m_SkillMap.Find(CurrentActiveSkillName);
 	if (!SkillData) return;
 
-	// 2. 타겟 정보 가져오기 (StateComponent의 어그로 타겟 활용)
+	// 2. 타겟 정보 가져오기
 	UStateComponent* StateComp = OwnerChar->FindComponentByClass<UStateComponent>();
 	AActor* Target = StateComp ? StateComp->GetAggroTarget() : nullptr;
 
-	// 3. 스킬 타입에 따른 분기 처리 (FST_Skill에 bIsRanged나 SkillType이 있다고 가정)
+	// --- [화면 출력 로그 추가] ---
+	if (GEngine)
+	{
+		uint64 Key = (uint64)GetOwner()->GetUniqueID() + 10; // State 로그와 겹치지 않게 오프셋 부여
+		FString TargetName = Target ? Target->GetName() : TEXT("None");
+		FString SkillInfo = FString::Printf(TEXT("<Skill Effect> %s (Target: %s)"), *CurrentActiveSkillName.ToString(), *TargetName);
+
+		GEngine->AddOnScreenDebugMessage(Key, 2.0f, FColor::Yellow, SkillInfo);
+	}
+
+	// 3. 스킬 타입에 따른 분기 처리
 	if (SkillData->SkillType == ESkillType::Projectile)
 	{
 		// 1. 장착된 무기에서 머즐 위치 정보만 가져오기
@@ -253,11 +263,24 @@ void USkillComponent::ExecuteSkillEffect()
 		// 주력 무기(오른손) 소켓 이름을 가져옴
 		FName MuzzleName = EquipComp ? EquipComp->GetMuzzleSocketName(EWeaponSlot::RightHand) : TEXT("Muzzle");
 
+		// [화면 출력] 발사체 모드 및 소켓 로그 추가
+		if (GEngine)
+		{
+			FString ProjectileLog = FString::Printf(TEXT("Mode: Projectile | Socket: %s"), *MuzzleName.ToString());
+			GEngine->AddOnScreenDebugMessage((uint64)GetOwner()->GetUniqueID() + 11, 2.0f, FColor::Orange, ProjectileLog);
+		}
+
 		// --- 원거리: 발사체 생성 ---
 		SpawnProjectile(SkillData, Target, MuzzleName);
 	}
 	else
 	{
+		// [화면 출력] 근접 모드 로그 추가
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage((uint64)GetOwner()->GetUniqueID() + 11, 2.0f, FColor::Red, TEXT("Mode: Melee Hit"));
+		}
+
 		// --- 근접: 즉시 히트 처리 ---
 		ProcessMeleeHit(SkillData, Target);
 	}
