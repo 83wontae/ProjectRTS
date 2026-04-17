@@ -13,6 +13,7 @@ UENUM(BlueprintType)
 enum class EBattleAnimType : uint8
 {
     None            UMETA(DisplayName = "None"),
+    OneHanded       UMETA(DisplayName = "OneHanded"),
     OneHandShield   UMETA(DisplayName = "OneHandShield"),
     Bow             UMETA(DisplayName = "Bow"),
     Spear           UMETA(DisplayName = "Spear"),
@@ -109,16 +110,16 @@ struct FST_Weapon : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     EWeaponType WeaponType;
 
-    /** 이 무기를 장착했을 때 추가될 기본 스킬 이름 */
+    /** 이 무기를 장착했을 때 추가될 기본 스킬 이름(미탑승 상태일 경우) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-    FName DefaultSkillName;
+    FName SkillName;
+
+    /** 이 무기를 장착했을 때 추가될 기본 스킬 이름(탑승 상태일 경우) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    FName SkillNameRide;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     EWeaponHandConstraint HandConstraint;
-
-    /** 스폰할 발사체 클래스 (원거리 무기일 경우) */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-    TSubclassOf<AActor> ProjectileClass;
 
     /** 발사체가 생성될 무기의 소켓 이름 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
@@ -126,12 +127,6 @@ struct FST_Weapon : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     class UStaticMesh* StaticMesh;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-    class UAnimMontage* AttackAnimation;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-    class UAnimMontage* RideAttackAnimation;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     double AttackPower;
@@ -249,7 +244,7 @@ struct FST_Skill : public FTableRowBase
     ESkillType SkillType;
 
     /** 발사체 스킬일 경우 사용할 클래스 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill", meta = (EditCondition = "SkillType == ESkillType::Projectile"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")
     TSubclassOf<AActor> ProjectileClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skill")

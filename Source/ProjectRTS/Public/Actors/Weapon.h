@@ -45,17 +45,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon|State")
 	bool IsCharRiding() const;
 
-	UFUNCTION(BlueprintCallable, Category = "Weapon|Combat")
-	void FireProjectile();
-
 	// --- IWeaponInterface 구현 ---
 	virtual FST_Weapon GetWeaponData_Implementation() const override;
 
 	virtual void SetWeaponVisibility_Implementation(bool bVisible) override;
 
-	virtual void OnWeaponAttack_Implementation(bool bIsRiding) override;
-
 	virtual AActor* GetWeaponOwner_Implementation() const override { return GetOwner(); }
-
-	virtual void ExecuteAttackNotify_Implementation() override;
 };

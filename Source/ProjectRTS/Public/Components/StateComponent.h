@@ -36,7 +36,7 @@ public:
 
     /** 유닛의 현재 공격력을 반환합니다. */
     UFUNCTION(BlueprintPure, Category = "RTS|State")
-    double GetAttackPower() const { return m_TotalStats.Attack; }
+    double GetTotalAttack() const { return m_TotalStats.Attack; }
 
     /** 기초 스탯 설정 */
     void SetBaseStats(const FST_Unit& UnitData);

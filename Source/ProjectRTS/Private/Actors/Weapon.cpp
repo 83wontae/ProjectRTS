@@ -126,38 +126,6 @@ bool AWeapon::IsCharRiding() const
 	return false;
 }
 
-void AWeapon::FireProjectile()
-{
-	// 1. 현재 무기 데이터를 구조체로부터 가져옵니다.
-	FST_Weapon Data = GetWeaponData_Implementation();
-
-	// 2. [가드 클로저] 데이터가 유효하지 않거나 메시가 없으면 즉시 종료
-	if (!Data.ProjectileClass || !WeaponMesh) return;
-
-	// 3. 구조체에 정의된 소켓 이름을 사용하여 위치와 회전을 결정합니다.
-	const FVector SpawnLocation = WeaponMesh->GetSocketLocation(Data.MuzzleSocketName);
-	const FRotator SpawnRotation = WeaponMesh->GetSocketRotation(Data.MuzzleSocketName);
-
-	// 4. 스폰 설정
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = GetOwner();
-	SpawnParams.Instigator = Cast<APawn>(GetOwner());
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	// 5. 구조체에 등록된 클래스로 발사체 생성
-	AActor* SpawnedProjectile = GetWorld()->SpawnActor<AActor>(
-		Data.ProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams
-	);
-
-	if (SpawnedProjectile)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[%s] Fired Projectile: %s"), *GetName(), *Data.ProjectileClass->GetName());
-	}
-}
-
 FST_Weapon AWeapon::GetWeaponData_Implementation() const
 {
 	if (WeaponTable && !WeaponRowName.IsNone())
@@ -174,56 +142,5 @@ void AWeapon::SetWeaponVisibility_Implementation(bool bVisible)
 	if (WeaponMesh)
 	{
 		WeaponMesh->SetVisibility(bVisible);
-	}
-}
-
-void AWeapon::OnWeaponAttack_Implementation(bool bIsRiding)
-{
-	ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
-	if (OwnerChar == nullptr)
-		return;
-
-	if (WeaponTable == nullptr)
-		return;
-
-	if (WeaponRowName.IsNone())
-		return;
-
-	FST_Weapon Data = GetWeaponData_Implementation();
-	if (Data.WeaponType == EWeaponType::None)
-		return;
-
-	UAnimMontage* SelectedMontage = IsCharRiding() ? Data.RideAttackAnimation : Data.AttackAnimation;
-
-	// 4. 선택된 몽타주 재생 [이미지: Play Anim Montage]
-	if (SelectedMontage)
-	{
-		OwnerChar->PlayAnimMontage(SelectedMontage);
-	}
-}
-
-void AWeapon::ExecuteAttackNotify_Implementation()
-{
-	// 1. 현재 무기의 데이터를 가져옵니다.
-	FST_Weapon Data = GetWeaponData_Implementation();
-	if (Data.WeaponType == EWeaponType::None)
-		return;
-
-	// 2. [이미지 888f1e 로직] 무기 타입에 따른 분기 처리
-	switch (Data.WeaponType)
-	{
-	case EWeaponType::Sword:
-		// 검(Sword)일 경우 근접 히트 판정 실행
-		ProcessWeaponHit();
-		break;
-
-	case EWeaponType::Bow:
-		// 활(Bow)일 경우 발사체 발사 실행
-		FireProjectile();
-		break;
-
-	default:
-		// 방패(Shield) 등 다른 타입은 현재 판정 로직이 없으므로 통과
-		break;
 	}
 }

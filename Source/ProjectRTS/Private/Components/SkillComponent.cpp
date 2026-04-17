@@ -8,6 +8,7 @@
 #include "Core/RtsGameState.h"
 #include "Components/StateComponent.h"
 #include "Components/EquipComponent.h"
+#include "Interface/ProjectileInterface.h"
 
 USkillComponent::USkillComponent()
 {
@@ -42,7 +43,7 @@ AActor* USkillComponent::FindBestTargetInRange()
 	// 2. 에러 로그 및 최소값 보정
 	if (ScanRange <= 0.0f)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] FindBestTarget: DetectionRange is 0.0f! 데이터 테이블 설정을 확인하세요."), *OwnerChar->GetName());
+		UE_LOG(LogTemp, Error, TEXT("[%s] FindBestTarget: DetectionRange is 0.0f!"), *OwnerChar->GetName());
 		ScanRange = 800.0f;
 	}
 
@@ -50,9 +51,19 @@ AActor* USkillComponent::FindBestTargetInRange()
 
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+	// 만약 건물 채널이 필요하다면 여기에 추가하세요.
 
 	TArray<AActor*> OutActors;
 	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), CenterPos, ScanRange, ObjectTypes, nullptr, { OwnerChar }, OutActors);
+
+	// --- [로그 추가: 주변 감지 결과] ---
+	if (GEngine)
+	{
+		uint64 Key = (uint64)OwnerChar->GetUniqueID() + 30; // 스탯/스킬 로그와 겹치지 않게 설정
+		FString DebugMsg = FString::Printf(TEXT("[%s] Scanning... Range: %.1f | Found Actors: %d"),
+			*OwnerChar->GetName(), ScanRange, OutActors.Num());
+		GEngine->AddOnScreenDebugMessage(Key, 1.5f, FColor::Silver, DebugMsg);
+	}
 
 	AActor* BestTarget = nullptr;
 	float MinDist = ScanRange;
@@ -61,8 +72,15 @@ AActor* USkillComponent::FindBestTargetInRange()
 	{
 		if (Actor)
 		{
+			bool bIsEnemy = GS->IsEnemyByActor(OwnerChar, Actor);
+			bool bIsDead = IUnitInterface::Execute_IsDeath(Actor);
+
+			// --- [상세 로그: 각 액터 판정 이유] ---
+			UE_LOG(LogTemp, Verbose, TEXT("Checking Actor: %s | IsEnemy: %s | IsDead: %s"),
+				*Actor->GetName(), bIsEnemy ? TEXT("True") : TEXT("False"), bIsDead ? TEXT("True") : TEXT("False"));
+
 			// GameState를 통한 진영 확인 및 인터페이스를 통한 사망 확인
-			if (GS->IsEnemyByActor(OwnerChar, Actor) && !IUnitInterface::Execute_IsDeath(Actor))
+			if (bIsEnemy && !bIsDead)
 			{
 				float Dist = FVector::Dist(CenterPos, Actor->GetActorLocation());
 				if (Dist < MinDist)
@@ -73,6 +91,19 @@ AActor* USkillComponent::FindBestTargetInRange()
 			}
 		}
 	}
+
+	// --- [최종 로그: 타겟 선정 결과] ---
+	if (GEngine)
+	{
+		uint64 Key = (uint64)OwnerChar->GetUniqueID() + 31;
+		FColor LogColor = BestTarget ? FColor::Green : FColor::Red;
+		FString ResultMsg = BestTarget ?
+			FString::Printf(TEXT("Best Target Found: %s (Dist: %.1f)"), *BestTarget->GetName(), MinDist) :
+			TEXT("No Valid Enemy in Range");
+
+		GEngine->AddOnScreenDebugMessage(Key, 2.0f, LogColor, ResultMsg);
+	}
+
 	return BestTarget;
 }
 
@@ -100,104 +131,95 @@ bool USkillComponent::IsCanAttack(AActor* InTarget)
 
 bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 {
-	// 1. 초기 상태 체크 로그
-	if (!OwnerChar)
-	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill Failed: OwnerChar is Null!"), *GetOwner()->GetName());
-		return false;
-	}
+	FString ActorName = OwnerChar ? OwnerChar->GetName() : TEXT("Unknown");
+	uint64 Key = (uint64)GetOwner()->GetUniqueID() + 50; // UseSkill 전용 키
 
+	// 1. [가드] 소유자 유효성 체크
+	if (!OwnerChar) return false;
+
+	// 2. [가드] 이미 공격 중인지 체크 (중복 실행 방지)
 	if (bIsAttacking)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill Skipped: Already Attacking."), *OwnerChar->GetName());
+		if (GEngine) GEngine->AddOnScreenDebugMessage(Key, 1.0f, FColor::Silver,
+			FString::Printf(TEXT("[%s] UseSkill: Already Attacking..."), *ActorName));
 		return false;
 	}
 
-	// 2. 스킬 이름 결정 로그
+	// 3. 스킬 이름 결정 (입력값이 없으면 기본 공격)
 	if (SkillName.IsNone())
 	{
 		SkillName = GetDefaultAttackSkillName();
-		UE_LOG(LogTemp, Log, TEXT("[%s] UseSkill: SkillName was None. Defaulted to [%s]"), *OwnerChar->GetName(), *SkillName.ToString());
 	}
 
-	// 3. 맵 데이터 검색 로그
+	// 4. 데이터 조회 및 Fallback 처리
 	const FST_Skill* SkillData = m_SkillMap.Find(SkillName);
 
-	// Fallback 로직 진입 시 로그
 	if (!SkillData && m_SkillMap.Num() > 0)
 	{
+		// 요청한 스킬이 없으면 맵의 첫 번째 스킬로 대체
 		TArray<FName> Keys;
 		m_SkillMap.GetKeys(Keys);
-		FName FallbackName = Keys[0];
-		UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill: Requested skill [%s] not found. Falling back to first available: [%s]"),
-			*OwnerChar->GetName(), *SkillName.ToString(), *FallbackName.ToString());
-
-		SkillName = FallbackName;
+		SkillName = Keys[0];
 		SkillData = m_SkillMap.Find(SkillName);
+
+		UE_LOG(LogTemp, Warning, TEXT("[%s] Skill not found, fallback to: %s"), *ActorName, *SkillName.ToString());
 	}
 
-	// 4. 최종 실행 여부 판단 로그
-	if (SkillData)
+	// 5. [가드] 최종 데이터 유효성 검사
+	if (!SkillData || !SkillData->SkillAnim)
 	{
-		if (SkillData->SkillAnim)
-		{
-			// 현재 실행 중인 스킬 이름 저장
-			CurrentActiveSkillName = SkillName;
-
-			// 타겟 방향 회전
-			if (InTarget)
-			{
-				FVector Dir = InTarget->GetActorLocation() - OwnerChar->GetActorLocation();
-				Dir.Z = 0.f;
-				OwnerChar->SetActorRotation(FRotationMatrix::MakeFromX(Dir).Rotator());
-				UE_LOG(LogTemp, Verbose, TEXT("[%s] UseSkill: Rotating towards Target [%s]"), *OwnerChar->GetName(), *InTarget->GetName());
-			}
-
-			// 애니메이션 실행
-			bIsAttacking = true;
-			float Duration = OwnerChar->PlayAnimMontage(SkillData->SkillAnim);
-
-			UE_LOG(LogTemp, Warning, TEXT("[%s] UseSkill SUCCESS: Playing Montage [%s]. Duration: %.2f"),
-				*OwnerChar->GetName(), *SkillName.ToString(), Duration);
-
-			OnSkillStarted.Broadcast(SkillName);
-			return true;
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill FAILED: SkillData found for [%s], but SkillAnim is NULL!"),
-				*OwnerChar->GetName(), *SkillName.ToString());
-		}
+		UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill Failed: Invalid SkillData or Anim for [%s]"), *ActorName, *SkillName.ToString());
+		return false;
 	}
-	else
+
+	// --- [성공 로직: 여기서부터 실행] ---
+	CurrentActiveSkillName = SkillName;
+
+	// 타겟 방향으로 즉시 회전
+	if (InTarget)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] UseSkill FAILED: Skill [%s] not found in m_SkillMap and no fallback possible."),
-			*OwnerChar->GetName(), *SkillName.ToString());
+		FVector Dir = InTarget->GetActorLocation() - OwnerChar->GetActorLocation();
+		Dir.Z = 0.f;
+		OwnerChar->SetActorRotation(FRotationMatrix::MakeFromX(Dir).Rotator());
 	}
 
-	return false;
+	// 애니메이션 실행
+	bIsAttacking = true;
+	float Duration = OwnerChar->PlayAnimMontage(SkillData->SkillAnim);
+
+	// 최종 성공 로그 (화면: 녹색 / 출력창: Warning으로 강조)
+	if (GEngine)
+	{
+		FString TargetName = InTarget ? InTarget->GetName() : TEXT("None");
+		GEngine->AddOnScreenDebugMessage(Key, 2.0f, FColor::Green,
+			FString::Printf(TEXT("[%s] UseSkill: %s -> %s"), *ActorName, *SkillName.ToString(), *TargetName));
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[%s] UseSkill SUCCESS: %s (Duration: %.2f)"), *ActorName, *SkillName.ToString(), Duration);
+
+	OnSkillStarted.Broadcast(SkillName);
+	return true;
 }
 
 FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
-	// 1. 인터페이스를 통해 상태 확인
-	bool bIsRiding = IUnitInterface::Execute_IsRiding(OwnerChar);
+	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
+	if (!EquipComp || !EquipComp->WeaponTable) return NAME_None;
 
-	// 사거리가 250 이상이면 원거리(Archer)로 판정하는 임시 로직
-	float AttackRange = IUnitInterface::Execute_GetAttackRange(OwnerChar);
-	bool bIsRanged = (AttackRange > 250.0f);
+	// 1. 현재 장착된 주 무기(오른손)의 이름을 가져옵니다.
+	FName WeaponRowName = EquipComp->m_RightWeaponName;
+	if (WeaponRowName.IsNone()) return NAME_None;
 
-	// 2. 조합에 따른 스킬 이름 결정
-	if (bIsRiding)
-	{
-		return bIsRanged ? FName("CavArcherAttack") : FName("CavAttack");
-	}
-	else
-	{
-		return bIsRanged ? FName("ArcherAttack") : FName("InfantryAttack");
-	}
+	// 2. 무기 데이터 테이블에서 스킬 정보를 확인합니다.
+	const FST_Weapon* WeaponData = EquipComp->WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
+	if (!WeaponData) return NAME_None;
+
+	// 3. 탑승 여부에 따라 반환할 스킬 이름을 결정합니다.
+	bool bIsRiding = EquipComp->IsRideState();
+
+	return bIsRiding ? WeaponData->SkillNameRide : WeaponData->SkillName;
 }
 
 void USkillComponent::AddSkill(FName SkillName)
@@ -241,44 +263,46 @@ void USkillComponent::ExecuteSkillEffect()
 	const FST_Skill* SkillData = m_SkillMap.Find(CurrentActiveSkillName);
 	if (!SkillData) return;
 
-	// 2. 타겟 정보 가져오기
+	// 2. 타겟 및 공격력 정보 확보
 	UStateComponent* StateComp = OwnerChar->FindComponentByClass<UStateComponent>();
 	AActor* Target = StateComp ? StateComp->GetAggroTarget() : nullptr;
+	double FinalAtk = StateComp ? StateComp->GetTotalAttack() : 0.0;
 
-	// --- [화면 출력 로그 추가] ---
+	FString ActorName = OwnerChar->GetName();
+	FString TargetName = Target ? Target->GetName() : TEXT("No Target");
+	uint64 KeyBase = (uint64)GetOwner()->GetUniqueID();
+
+	// --- [로그 1] 스킬 실행 기본 정보 (노란색) ---
 	if (GEngine)
 	{
-		uint64 Key = (uint64)GetOwner()->GetUniqueID() + 10; // State 로그와 겹치지 않게 오프셋 부여
-		FString TargetName = Target ? Target->GetName() : TEXT("None");
-		FString SkillInfo = FString::Printf(TEXT("<Skill Effect> %s (Target: %s)"), *CurrentActiveSkillName.ToString(), *TargetName);
-
-		GEngine->AddOnScreenDebugMessage(Key, 2.0f, FColor::Yellow, SkillInfo);
+		FString Msg = FString::Printf(TEXT("[%s] <Execute> %s (Target: %s)"),
+			*ActorName, *CurrentActiveSkillName.ToString(), *TargetName);
+		GEngine->AddOnScreenDebugMessage(KeyBase + 10, 2.0f, FColor::Yellow, Msg);
 	}
 
 	// 3. 스킬 타입에 따른 분기 처리
 	if (SkillData->SkillType == ESkillType::Projectile)
 	{
-		// 1. 장착된 무기에서 머즐 위치 정보만 가져오기
 		UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
-		// 주력 무기(오른손) 소켓 이름을 가져옴
-		FName MuzzleName = EquipComp ? EquipComp->GetMuzzleSocketName(EWeaponSlot::RightHand) : TEXT("Muzzle");
+		// 앞서 만든 GetMainMuzzleLocation 활용 (파라미터 없음)
+		FVector MuzzleLoc = EquipComp ? EquipComp->GetMainMuzzleLocation() : OwnerChar->GetActorLocation();
 
-		// [화면 출력] 발사체 모드 및 소켓 로그 추가
+		// --- [로그 2] 발사체 정보 (주황색) ---
 		if (GEngine)
 		{
-			FString ProjectileLog = FString::Printf(TEXT("Mode: Projectile | Socket: %s"), *MuzzleName.ToString());
-			GEngine->AddOnScreenDebugMessage((uint64)GetOwner()->GetUniqueID() + 11, 2.0f, FColor::Orange, ProjectileLog);
+			FString ProjMsg = FString::Printf(TEXT(">> Projectile Spawned at: %s"), *MuzzleLoc.ToCompactString());
+			GEngine->AddOnScreenDebugMessage(KeyBase + 11, 2.0f, FColor::Orange, ProjMsg);
 		}
 
 		// --- 원거리: 발사체 생성 ---
-		SpawnProjectile(SkillData, Target, MuzzleName);
+		SpawnProjectile(SkillData, Target, MuzzleLoc);
 	}
 	else
 	{
-		// [화면 출력] 근접 모드 로그 추가
+		// --- [로그 2] 근접 타격 정보 (빨간색) ---
 		if (GEngine)
 		{
-			GEngine->AddOnScreenDebugMessage((uint64)GetOwner()->GetUniqueID() + 11, 2.0f, FColor::Red, TEXT("Mode: Melee Hit"));
+			GEngine->AddOnScreenDebugMessage(KeyBase + 11, 2.0f, FColor::Red, TEXT(">> Melee Processing..."));
 		}
 
 		// --- 근접: 즉시 히트 처리 ---
@@ -286,18 +310,15 @@ void USkillComponent::ExecuteSkillEffect()
 	}
 }
 
-void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FName MuzzleName)
+void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc)
 {
 	if (!SkillData->ProjectileClass || !OwnerChar) return;
 
-	// 5. 무기에 설정된 소켓 위치를 찾습니다.
-	// 무기는 캐릭터의 Mesh에 붙어있으므로 Mesh에서 소켓 위치를 찾으면 됩니다.
-	FVector SpawnLocation = OwnerChar->GetMesh()->GetSocketLocation(MuzzleName);
 	FRotator SpawnRotation = OwnerChar->GetActorRotation();
 
 	if (Target)
 	{
-		SpawnRotation = (Target->GetActorLocation() - SpawnLocation).Rotation();
+		SpawnRotation = (Target->GetActorLocation() - MuzzleLoc).Rotation();
 	}
 
 	FActorSpawnParameters SpawnParams;
@@ -306,30 +327,35 @@ void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target
 
 	// 발사체 스폰 (Deferred Spawn 권장)
 	// 발사체 클래스 내부에서 타겟 정보와 데미지를 받아 처리하도록 설계합니다.
-	AActor* Projectile = GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
+	AActor* Projectile = GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, MuzzleLoc, SpawnRotation, SpawnParams);
 
-	// Projectile->Initialize(Target, TotalDamage); // 발사체 초기화 로직 (클래스에 따라 구현)
+	if (Projectile->Implements<UProjectileInterface>())
+	{
+		double FinalAtk = OwnerChar->FindComponentByClass<UStateComponent>()->GetTotalAttack();
+
+		// 화살이든, 레이저든, 검기든 똑같이 이 함수만 호출하면 끝!
+		IProjectileInterface::Execute_SetupProjectile(Projectile, OwnerChar, Target, FinalAtk);
+	}
 }
 
 void USkillComponent::ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target)
 {
-	// [가드 클로저] 타겟이 없거나 이미 죽었으면 무시
 	if (!Target || IUnitInterface::Execute_IsDeath(Target)) return;
 
-	// 사거리 재확인 (애니메이션 도중 적이 도망갔을 경우 대비)
-	if (!IsCanAttack(Target)) return;
-
-
-	// 상대방 StateComponent에 데미지 전달
+	UStateComponent* MyState = OwnerChar->FindComponentByClass<UStateComponent>();
 	UStateComponent* TargetState = Target->FindComponentByClass<UStateComponent>();
 
-	// 데미지 계산 (유닛 기본 공격력 * 스킬 계수)
-	float BaseDamage = TargetState->GetAttackPower(); // 유닛의 기본 공격력 (StateComponent에서 가져온다고 가정)
-
-	if (TargetState)
+	if (MyState && TargetState)
 	{
-		TargetState->AddDamage(BaseDamage);
-		UE_LOG(LogTemp, Log, TEXT("[%s] Melee Hit on [%s]: %f Damage"), *OwnerChar->GetName(), *Target->GetName(), BaseDamage);
+		// [통합] 최종 합산 스탯(TotalStats)의 공격력을 적용합니다.
+		double Damage = MyState->GetTotalAttack();
+		TargetState->AddDamage(Damage);
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+				FString::Printf(TEXT("Melee Hit: %.1f Damage"), Damage));
+		}
 	}
 }
 

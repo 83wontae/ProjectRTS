@@ -55,7 +55,7 @@ public:
 
 	void ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target);
 
-	void SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FName MuzzleName);
+	void SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc);
 
 protected:
 	/** 공격 종료 시 상태 초기화를 위한 콜백 */

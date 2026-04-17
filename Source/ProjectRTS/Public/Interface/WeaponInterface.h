@@ -28,15 +28,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "RTS|Weapon")
 	void SetWeaponVisibility(bool bVisible);
 
-	/** 공격 애니메이션이나 이펙트를 실행합니다. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "RTS|Weapon")
-	void OnWeaponAttack(bool bIsRiding);
-
 	/** 현재 무기의 소유자를 반환합니다. */
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "RTS|Weapon")
 	class AActor* GetWeaponOwner() const;
-
-	/** AnimNotify에서 호출 */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "RTS|Weapon")
-	void ExecuteAttackNotify();
 };

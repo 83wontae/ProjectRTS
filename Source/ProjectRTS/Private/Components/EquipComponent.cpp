@@ -5,6 +5,8 @@
 #include "GameFramework/Character.h"
 #include "Actors/Weapon.h"
 #include "Components/StateComponent.h"
+#include "Components/SkillComponent.h"
+#include "Interface/WeaponInterface.h"
 
 // Sets default values for this component's properties
 UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
@@ -22,8 +24,7 @@ void UEquipComponent::BeginPlay()
 
 	OwnerChar = Cast<ACharacter>(GetOwner());
 
-	HandleWeaponAttachment(m_RightWeaponName, EWeaponSlot::RightHand);
-	HandleWeaponAttachment(m_LeftWeaponName, EWeaponSlot::LeftHand);
+	RefreshWeaponsInEditor();
 }
 
 void UEquipComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -87,6 +88,7 @@ void UEquipComponent::RefreshWeaponsInEditor()
 	// HandleWeaponAttachment 내부에서 이미 Destroy() 로직이 있으므로 안전합니다.
 	HandleWeaponAttachment(m_RightWeaponName, EWeaponSlot::RightHand);
 	HandleWeaponAttachment(m_LeftWeaponName, EWeaponSlot::LeftHand);
+	UpdateBattleAnimType();
 }
 
 void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
@@ -259,44 +261,94 @@ void UEquipComponent::OnRep_BattleAnimType()
 
 void UEquipComponent::UpdateBattleAnimType()
 {
+	// 1. [가드 클로저] 서버 권한 및 데이터 테이블 유효성 확인
 	if (GetOwnerRole() != ROLE_Authority || !WeaponTable) return;
 
 	EBattleAnimType NewType = EBattleAnimType::None;
 
-	// RowName을 이용해 데이터 조회 후 로직 판정
-	FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT(""));
-	if (RightData)
+	// 2. 무기 데이터 조회 (Null 체크 포함)
+	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT(""));
+	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT(""));
+
+	// 3. 애니메이션 타입 결정 (우선순위 로직)
+	if (LeftData && LeftData->WeaponType == EWeaponType::Bow)
 	{
-		if (RightData->WeaponType == EWeaponType::Bow) NewType = EBattleAnimType::Bow;
-		else if (RightData->WeaponType == EWeaponType::Sword) NewType = EBattleAnimType::OneHandShield;
+		// 왼손에 활이 있으면 우선적으로 Bow 타입 지정
+		NewType = EBattleAnimType::Bow;
+	}
+	else if (RightData && RightData->WeaponType == EWeaponType::Sword)
+	{
+		// 오른손에 검이 있으면 OneHandShield 타입 지정
+		NewType = EBattleAnimType::OneHandShield;
+	}
+	else if (RightData || LeftData)
+	{
+		// 무기가 하나라도 있지만 위 조건에 해당하지 않을 경우의 기본값
+		NewType = EBattleAnimType::OneHandShield;
 	}
 
+	// 4. 상태 변경 시에만 업데이트 및 로그 출력
 	if (m_BattleAnimType != NewType)
 	{
+		// --- [정리된 화면 로그] ---
+		if (GEngine)
+		{
+			uint64 Key = (uint64)GetOwner()->GetUniqueID() + 20;
+			const UEnum* EnumPtr = StaticEnum<EBattleAnimType>();
+			FString OldName = EnumPtr ? EnumPtr->GetNameStringByValue((int64)m_BattleAnimType) : TEXT("None");
+			FString NewName = EnumPtr ? EnumPtr->GetNameStringByValue((int64)NewType) : TEXT("None");
+
+			FString FinalMsg = FString::Printf(TEXT("[%s] Anim Style: %s -> %s"),
+				*GetOwner()->GetName(), *OldName, *NewName);
+
+			GEngine->AddOnScreenDebugMessage(Key, 5.0f, FColor::Cyan, FinalMsg);
+		}
+
 		m_BattleAnimType = NewType;
-		OnRep_BattleAnimType();
+		OnRep_BattleAnimType(); // 클라이언트 알림
 	}
 }
 
-FName UEquipComponent::GetMuzzleSocketName(EWeaponSlot Slot) const
+FVector UEquipComponent::GetMainMuzzleLocation() const
 {
-	// 1. [가드 클로저] 데이터 테이블 유효성 확인
-	if (!WeaponTable) return TEXT("Muzzle");
+	FString ActorName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown");
+	uint64 Key = (uint64)GetOwner()->GetUniqueID() + 40;
 
-	// 2. 슬롯에 따른 무기 이름 결정
-	FName TargetWeaponName = (Slot == EWeaponSlot::RightHand) ? m_RightWeaponName : m_LeftWeaponName;
-
-	// 3. [가드 클로저] 무기가 장착되어 있지 않으면 기본값 반환
-	if (TargetWeaponName.IsNone()) return TEXT("Muzzle");
-
-	// 4. 데이터 테이블 조회 및 소켓 이름 반환
-	FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(TargetWeaponName, TEXT(""));
-	if (WeaponData && !WeaponData->MuzzleSocketName.IsNone())
+	// 1. 메인 무기 액터 유효성 검사
+	AWeapon* MainWeapon = IsValid(WeaponActor_R) ? WeaponActor_R : WeaponActor_L;
+	if (!IsValid(MainWeapon))
 	{
-		return WeaponData->MuzzleSocketName;
+		return GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
 	}
 
-	return TEXT("Muzzle");
+	// 2. [수정된 인터페이스 호출] 캐스팅 후 직접 호출이 아닌 Execute_ 형식을 사용합니다.
+	// BlueprintNativeEvent는 인터페이스 포인터가 아닌 액터 포인터를 넘겨야 합니다.
+	if (!MainWeapon->Implements<UWeaponInterface>())
+	{
+		return MainWeapon->GetActorLocation();
+	}
+
+	// IWeaponInterface::Execute_함수이름(대상액터) 형식으로 호출
+	FST_Weapon WeaponData = IWeaponInterface::Execute_GetWeaponData(MainWeapon);
+
+	// 3. 데이터 및 머즐 소켓 유효성 검사
+	if (WeaponData.MuzzleSocketName.IsNone())
+	{
+		return MainWeapon->GetActorLocation();
+	}
+
+	// 4. 무기 액터 '내부'의 메쉬 컴포넌트에서 소켓 찾기
+	UMeshComponent* WeaponMesh = MainWeapon->FindComponentByClass<UMeshComponent>();
+	if (!WeaponMesh || !WeaponMesh->DoesSocketExist(WeaponData.MuzzleSocketName))
+	{
+		return MainWeapon->GetActorLocation();
+	}
+
+	// 5. [성공] 최종 위치 반환
+	if (GEngine) GEngine->AddOnScreenDebugMessage(Key, 1.0f, FColor::Green,
+		FString::Printf(TEXT("[%s] Muzzle Found: %s"), *ActorName, *WeaponData.MuzzleSocketName.ToString()));
+
+	return WeaponMesh->GetSocketLocation(WeaponData.MuzzleSocketName);
 }
 
 FName UEquipComponent::GetTargetSocketName(const FST_Weapon& WeaponData, EWeaponSlot RequestedSlot) const
@@ -371,11 +423,21 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	{
 		NewWeapon->InitializeWeapon(WeaponTable, WeaponName);
 
-		if (TargetChar->GetMesh())
+		// --- [추가된 부착 로직] ---
+		// 캐릭터 메쉬의 지정된 소켓에 무기를 붙입니다.
+		FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+		NewWeapon->AttachToComponent(TargetChar->GetMesh(), AttachRules, FinalSocket);
+
+		// 변수에 할당하여 관리
+		*TargetActorVar = NewWeapon;
+
+		// --- [스킬 추가 로직] ---
+		USkillComponent* SkillComp = GetOwner()->FindComponentByClass<USkillComponent>();
+		if (SkillComp)
 		{
-			FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-			NewWeapon->AttachToComponent(TargetChar->GetMesh(), AttachRules, FinalSocket);
-			*TargetActorVar = NewWeapon;
+			FST_Weapon WeaponData = NewWeapon->GetWeaponData_Implementation();
+			if (!WeaponData.SkillName.IsNone()) SkillComp->AddSkill(WeaponData.SkillName);
+			if (!WeaponData.SkillNameRide.IsNone()) SkillComp->AddSkill(WeaponData.SkillNameRide);
 		}
 	}
 }
