@@ -34,6 +34,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Combat")
 	bool UseSkill(FName SkillName, AActor* InTarget);
 
+	/** BTTask 등에서 호출하는 범용 공격 함수 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Combat")
+	bool ExecuteBestAttack(AActor* InTarget);
+
 	/** 현재 공격(몽타주 재생) 중인지 여부 */
 	UPROPERTY(BlueprintReadOnly, Category = "RTS|Combat")
 	bool bIsAttacking;

@@ -9,6 +9,7 @@
 #include "Components/StateComponent.h"
 #include "Components/EquipComponent.h"
 #include "Interface/ProjectileInterface.h"
+#include "Kismet/GameplayStatics.h"
 
 USkillComponent::USkillComponent()
 {
@@ -195,28 +196,36 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 			FString::Printf(TEXT("[%s] UseSkill: %s -> %s"), *ActorName, *SkillName.ToString(), *TargetName));
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[%s] UseSkill SUCCESS: %s (Duration: %.2f)"), *ActorName, *SkillName.ToString(), Duration);
-
 	OnSkillStarted.Broadcast(SkillName);
 	return true;
+}
+
+bool USkillComponent::ExecuteBestAttack(AActor* InTarget)
+{
+	// 1. 현재 상태에 맞는 최적의 스킬 이름 가져오기
+	FName BestSkillName = GetDefaultAttackSkillName();
+
+	// 2. 결정된 스킬로 실행 요청
+	return UseSkill(BestSkillName, InTarget);
 }
 
 FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
+	// EquipComponent를 통해 현재 장착된 무기 정보를 가져옵니다.
 	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
 	if (!EquipComp || !EquipComp->WeaponTable) return NAME_None;
 
-	// 1. 현재 장착된 주 무기(오른손)의 이름을 가져옵니다.
-	FName WeaponRowName = EquipComp->m_RightWeaponName;
-	if (WeaponRowName.IsNone()) return NAME_None;
+	// 1. 현재 메인 무기(오른손) 확인
+	FName MainWeaponName = EquipComp->m_RightWeaponName;
+	if (MainWeaponName.IsNone()) return NAME_None;
 
-	// 2. 무기 데이터 테이블에서 스킬 정보를 확인합니다.
-	const FST_Weapon* WeaponData = EquipComp->WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
+	// 2. 무기 데이터 테이블에서 스킬 이름 추출
+	const FST_Weapon* WeaponData = EquipComp->WeaponTable->FindRow<FST_Weapon>(MainWeaponName, TEXT(""));
 	if (!WeaponData) return NAME_None;
 
-	// 3. 탑승 여부에 따라 반환할 스킬 이름을 결정합니다.
+	// 3. 탑승 상태에 따라 무기에 정의된 스킬 선택
 	bool bIsRiding = EquipComp->IsRideState();
 
 	return bIsRiding ? WeaponData->SkillNameRide : WeaponData->SkillName;
@@ -340,33 +349,34 @@ void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target
 
 void USkillComponent::ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target)
 {
+	// 1. [가드] 타겟 유효성 및 생존 확인
 	if (!Target || IUnitInterface::Execute_IsDeath(Target)) return;
 
+	// 2. [가드] 내 상태 및 공격력 확인
 	UStateComponent* MyState = OwnerChar->FindComponentByClass<UStateComponent>();
-	UStateComponent* TargetState = Target->FindComponentByClass<UStateComponent>();
+	if (!MyState) return;
 
-	if (MyState && TargetState)
+	double Damage = MyState->GetTotalAttack();
+
+	// 3. 언리얼 표준 데미지 전달
+	// 파라미터: 타겟, 데미지량, 가해자 컨트롤러, 가해자 액터, 데미지 타입 클래스
+	UGameplayStatics::ApplyDamage(
+		Target,
+		(float)Damage,
+		OwnerChar->GetController(),
+		OwnerChar,
+		nullptr // 필요 시 UDamageType 자식 클래스 지정 가능
+	);
+
+	// 시각적 확인용 로그
+	if (GEngine)
 	{
-		// [통합] 최종 합산 스탯(TotalStats)의 공격력을 적용합니다.
-		double Damage = MyState->GetTotalAttack();
-		TargetState->AddDamage(Damage);
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
-				FString::Printf(TEXT("Melee Hit: %.1f Damage"), Damage));
-		}
+		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+			FString::Printf(TEXT("[%s] ApplyDamage to [%s]: %.1f"), *OwnerChar->GetName(), *Target->GetName(), Damage));
 	}
 }
 
 void USkillComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	// [로그 추가] 몽타주 종료 시점 확인
-	UE_LOG(LogTemp, Warning, TEXT("[%s] OnAttackMontageEnded: Montage [%s] Finished. Interrupted: %s"),
-		*OwnerChar->GetName(), *Montage->GetName(), bInterrupted ? TEXT("True") : TEXT("False"));
-
 	bIsAttacking = false;
-
-	// [로그 추가] 상태 해제 확인
-	UE_LOG(LogTemp, Log, TEXT("[%s] bIsAttacking set to FALSE."), *OwnerChar->GetName());
 }

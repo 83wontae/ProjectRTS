@@ -49,6 +49,18 @@ void ARtsUnitCharacter::BeginPlay()
     InitializeUnit();
 }
 
+float ARtsUnitCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+    if (StateComp)
+    {
+        StateComp->AddDamage((double)ActualDamage);
+    }
+
+    return ActualDamage;
+}
+
 #if WITH_EDITOR
 void ARtsUnitCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {

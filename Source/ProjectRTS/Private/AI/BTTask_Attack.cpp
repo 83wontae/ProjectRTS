@@ -33,23 +33,16 @@ EBTNodeResult::Type UBTTask_Attack::ExecuteTask(UBehaviorTreeComponent& OwnerCom
 	AActor* Target = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetActorKey.SelectedKeyName));
 	FString TargetName = Target ? Target->GetName() : TEXT("NULL");
 
-	UE_LOG(LogTemp, Log, TEXT("[%s] BTTask_Attack: Attempting attack on Target [%s]"), *ControlledPawn->GetName(), *TargetName);
-
 	// 2. 공격 실행
-	bool bSuccess = SkillComp->UseSkill(NAME_None, Target);
+	bool bSuccess = SkillComp->ExecuteBestAttack(Target);
 
 	if (bSuccess)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] BTTask_Attack: UseSkill Successful -> InProgress"), *ControlledPawn->GetName());
-		return EBTNodeResult::InProgress;
+		// 공격 애니메이션 시작 성공 시 노드 종료 (애니메이션 루프는 BT에서 제어)
+		return EBTNodeResult::Succeeded;
 	}
-	else
-	{
-		// 실패 원인 분석 로그 (이미 공격 중인지, 쿨타임인지 등)
-		UE_LOG(LogTemp, Error, TEXT("[%s] BTTask_Attack: UseSkill Failed! (Check: bIsAttacking=%s, SkillMap empty?)"),
-			*ControlledPawn->GetName(), SkillComp->bIsAttacking ? TEXT("True") : TEXT("False"));
-		return EBTNodeResult::Failed;
-	}
+
+	return EBTNodeResult::Failed;
 }
 
 void UBTTask_Attack::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
