@@ -27,8 +27,6 @@ void USkillComponent::BeginPlay()
 			OwnerChar->GetMesh()->GetAnimInstance()->OnMontageEnded.AddDynamic(this, &USkillComponent::OnAttackMontageEnded);
 		}
 	}
-
-	AddSkill(GetDefaultAttackSkillName());
 }
 
 AActor* USkillComponent::FindBestTargetInRange()

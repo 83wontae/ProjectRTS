@@ -412,33 +412,65 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 		*TargetActorVar = nullptr;
 	}
 
-	// 7. 스폰 및 부착
+	// 7. 스폰 실행
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = GetOwner();
 	SpawnParams.Instigator = Cast<APawn>(GetOwner());
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	AWeapon* NewWeapon = World->SpawnActor<AWeapon>(WeaponClass, SpawnParams);
-	if (NewWeapon)
+
+	// [가드] 스폰 실패 처리
+	if (!NewWeapon)
 	{
-		NewWeapon->InitializeWeapon(WeaponTable, WeaponName);
+		UE_LOG(LogTemp, Error, TEXT("[%s] SpawnWeapon FAILED: %s"), *GetOwner()->GetName(), *WeaponName.ToString());
+		return;
+	}
 
-		// --- [추가된 부착 로직] ---
-		// 캐릭터 메쉬의 지정된 소켓에 무기를 붙입니다.
-		FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-		NewWeapon->AttachToComponent(TargetChar->GetMesh(), AttachRules, FinalSocket);
+	// 초기화 및 부착
+	NewWeapon->InitializeWeapon(WeaponTable, WeaponName);
 
-		// 변수에 할당하여 관리
-		*TargetActorVar = NewWeapon;
+	// --- [부착 로직 및 로그] ---
+	FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+	NewWeapon->AttachToComponent(TargetChar->GetMesh(), AttachRules, FinalSocket);
 
-		// --- [스킬 추가 로직] ---
-		USkillComponent* SkillComp = GetOwner()->FindComponentByClass<USkillComponent>();
-		if (SkillComp)
-		{
-			FST_Weapon WeaponData = NewWeapon->GetWeaponData_Implementation();
-			if (!WeaponData.SkillName.IsNone()) SkillComp->AddSkill(WeaponData.SkillName);
-			if (!WeaponData.SkillNameRide.IsNone()) SkillComp->AddSkill(WeaponData.SkillNameRide);
-		}
+	if (GEngine)
+	{
+		uint64 Key = (uint64)GetOwner()->GetUniqueID() + 60;
+		FString AttachMsg = FString::Printf(TEXT("<Equip> %s attached to [%s]"), *WeaponName.ToString(), *FinalSocket.ToString());
+		GEngine->AddOnScreenDebugMessage(Key, 3.0f, FColor::Cyan, AttachMsg);
+	}
+
+	// 변수 할당
+	*TargetActorVar = NewWeapon;
+
+	// --- [스킬 추가 로직 및 로그] ---
+	USkillComponent* SkillComp = GetOwner()->FindComponentByClass<USkillComponent>();
+	if (!SkillComp) return; // 스킬 컴포넌트 없으면 종료 (계단 방지)
+
+	// 인터페이스를 통한 데이터 확보 (포인터가 아닌 값 반환 대응)
+	FST_Weapon WeaponData = NewWeapon->GetWeaponData_Implementation();
+
+	// 스킬 등록 및 상세 로그 출력
+	if (!WeaponData.SkillName.IsNone())
+	{
+		SkillComp->AddSkill(WeaponData.SkillName);
+		UE_LOG(LogTemp, Log, TEXT("[%s] Added Skill: %s"), *GetOwner()->GetName(), *WeaponData.SkillName.ToString());
+	}
+
+	if (!WeaponData.SkillNameRide.IsNone())
+	{
+		SkillComp->AddSkill(WeaponData.SkillNameRide);
+		UE_LOG(LogTemp, Log, TEXT("[%s] Added Ride Skill: %s"), *GetOwner()->GetName(), *WeaponData.SkillNameRide.ToString());
+	}
+
+	// 화면에 최종 등록 결과 표시
+	if (GEngine)
+	{
+		uint64 Key = (uint64)GetOwner()->GetUniqueID() + 61;
+		FString SkillMsg = FString::Printf(TEXT("Skills: [%s] / [%s]"),
+			*WeaponData.SkillName.ToString(), *WeaponData.SkillNameRide.ToString());
+		GEngine->AddOnScreenDebugMessage(Key, 3.0f, FColor::Green, SkillMsg);
 	}
 }
 
