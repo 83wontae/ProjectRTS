@@ -61,6 +61,8 @@ public:
 
 	void SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc);
 
+	void UpdateDebugWidget();
+
 protected:
 	/** 공격 종료 시 상태 초기화를 위한 콜백 */
 	UFUNCTION()

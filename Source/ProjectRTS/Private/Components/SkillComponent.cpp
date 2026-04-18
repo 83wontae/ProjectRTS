@@ -10,6 +10,7 @@
 #include "Components/EquipComponent.h"
 #include "Interface/ProjectileInterface.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/DebugWidgetComponent.h"
 
 USkillComponent::USkillComponent()
 {
@@ -155,13 +156,18 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 
 	if (!SkillData && m_SkillMap.Num() > 0)
 	{
-		// 요청한 스킬이 없으면 맵의 첫 번째 스킬로 대체
+		// [수정] 어떤 이름을 찾으려 했는지 로그에 추가
+		FName FailedName = SkillName;
+
 		TArray<FName> Keys;
 		m_SkillMap.GetKeys(Keys);
 		SkillName = Keys[0];
 		SkillData = m_SkillMap.Find(SkillName);
 
-		UE_LOG(LogTemp, Warning, TEXT("[%s] Skill not found, fallback to: %s"), *ActorName, *SkillName.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("[%s] Skill [%s] not found! Falling back to: [%s]"),
+			*ActorName,
+			*FailedName.ToString(), // 이 녀석이 None인지 다른 이름인지 확인해야 합니다.
+			*SkillName.ToString());
 	}
 
 	// 5. [가드] 최종 데이터 유효성 검사
@@ -195,6 +201,10 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 	}
 
 	OnSkillStarted.Broadcast(SkillName);
+
+	// --- [추가] 활성화된 스킬 표시를 위해 위젯 갱신 ---
+	UpdateDebugWidget();
+
 	return true;
 }
 
@@ -211,21 +221,26 @@ FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
-	// EquipComponent를 통해 현재 장착된 무기 정보를 가져옵니다.
 	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
 	if (!EquipComp || !EquipComp->WeaponTable) return NAME_None;
 
-	// 1. 현재 메인 무기(오른손) 확인
-	FName MainWeaponName = EquipComp->m_RightWeaponName;
-	if (MainWeaponName.IsNone()) return NAME_None;
+	// 1. 메인 무기 이름 결정 (오른손 우선, 없으면 왼손)
+	FName MainWeaponName = !EquipComp->m_RightWeaponName.IsNone() ?
+		EquipComp->m_RightWeaponName : EquipComp->m_LeftWeaponName;
 
-	// 2. 무기 데이터 테이블에서 스킬 이름 추출
+	// 2. [가드] 양손 모두 무기가 없는 경우
+	if (MainWeaponName.IsNone())
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[%s] No weapon found in either hand."), *OwnerChar->GetName());
+		return NAME_None;
+	}
+
+	// 3. 데이터 테이블에서 스킬 이름 찾기
 	const FST_Weapon* WeaponData = EquipComp->WeaponTable->FindRow<FST_Weapon>(MainWeaponName, TEXT(""));
 	if (!WeaponData) return NAME_None;
 
-	// 3. 탑승 상태에 따라 무기에 정의된 스킬 선택
+	// 4. 탑승 여부에 따른 최종 스킬 반환
 	bool bIsRiding = EquipComp->IsRideState();
-
 	return bIsRiding ? WeaponData->SkillNameRide : WeaponData->SkillName;
 }
 
@@ -246,6 +261,9 @@ void USkillComponent::AddSkill(FName SkillName)
 	{
 		// 3. 맵에 추가 (이미 존재하면 업데이트됨)
 		m_SkillMap.Add(SkillName, *FoundData);
+
+		// --- [추가] 스킬이 추가될 때마다 디버그 위젯 갱신 ---
+		UpdateDebugWidget();
 
 		UE_LOG(LogTemp, Log, TEXT("[%s] Successfully added skill: %s"), *GetOwner()->GetName(), *SkillName.ToString());
 	}
@@ -343,6 +361,27 @@ void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target
 		// 화살이든, 레이저든, 검기든 똑같이 이 함수만 호출하면 끝!
 		IProjectileInterface::Execute_SetupProjectile(Projectile, OwnerChar, Target, FinalAtk);
 	}
+}
+
+void USkillComponent::UpdateDebugWidget()
+{
+	// 1. [가드] 디버그 컴포넌트 찾기
+	UDebugWidgetComponent* DebugComp = GetOwner()->FindComponentByClass<UDebugWidgetComponent>();
+	if (!DebugComp) return;
+
+	// 2. 출력할 문자열 리스트 생성
+	TArray<FString> SkillLogs;
+	SkillLogs.Add(FString::Printf(TEXT("=== Owned Skills (%d) ==="), m_SkillMap.Num()));
+
+	// 3. 맵을 순회하며 스킬 이름 담기
+	for (auto& Elem : m_SkillMap)
+	{
+		FString ActiveMark = (Elem.Key == CurrentActiveSkillName) ? TEXT("[Active] ") : TEXT("- ");
+		SkillLogs.Add(ActiveMark + Elem.Key.ToString());
+	}
+
+	// 4. 위젯 컴포넌트에 전달
+	DebugComp->UpdateLogList(SkillLogs);
 }
 
 void USkillComponent::ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target)
