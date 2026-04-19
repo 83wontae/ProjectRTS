@@ -197,28 +197,84 @@ struct FST_UnitStats
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    // --- [레벨 시스템] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level")
+    int32 Level = 1;
+
+    // --- [기본 주요 스탯 (Primary Attributes)] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
+    double Strength = 0.0;      // 힘: 물리 공격력, 최대 체력에 영향
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
+    double Agility = 0.0;       // 민첩: 공격 속도, 이동 속도, 방어력에 영향
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
+    double Intelligence = 0.0;  // 지능: 스킬 데미지, 마나량에 영향
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
+    double Stamina = 0.0;       // 스테미너: 최대 체력, 행동력에 영향
+
+    // --- [파생 전투 스탯 (Derived Stats)] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
     double Attack = 0.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
     double MaxHp = 0.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
     double Defend = 0.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
     double Speed = 0.0;
 
-    // 더하기 연산자 오버로딩 (Base + Equip 연산을 편리하게 하기 위함)
+    // 더하기 연산자 오버로딩 (아이템 장착 시나 레벨업 보너스 합산용)
     FST_UnitStats operator+(const FST_UnitStats& Other) const
     {
         FST_UnitStats Result;
+        Result.Level = Level + Other.Level;
+        Result.Strength = Strength + Other.Strength;
+        Result.Agility = Agility + Other.Agility;
+        Result.Intelligence = Intelligence + Other.Intelligence;
+        Result.Stamina = Stamina + Other.Stamina;
+
         Result.Attack = Attack + Other.Attack;
         Result.MaxHp = MaxHp + Other.MaxHp;
         Result.Defend = Defend + Other.Defend;
         Result.Speed = Speed + Other.Speed;
         return Result;
     }
+};
+
+/** 유닛의 직업 종류 */
+UENUM(BlueprintType)
+enum class EUnitJob : uint8
+{
+    None		UMETA(DisplayName = "None"),        // 시스템 에러 체크용
+	Novice		UMETA(DisplayName = "Novice"),      // 견습생 (초기 직업)
+    Warrior		UMETA(DisplayName = "Warrior"),     // 전사
+	Mage		UMETA(DisplayName = "Mage"),        // 마법사
+	Rogue		UMETA(DisplayName = "Rogue"),       // 도적
+	Priest		UMETA(DisplayName = "Priest"),      // 성직자
+    MAX
+};
+
+/** 직업별 레벨업 성장 수치 데이터 */
+USTRUCT(BlueprintType)
+struct FST_ClassGrowth : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double PlusStr = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double PlusAgi = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double PlusInt = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    double PlusSta = 0.0;
 };
 
 /** 스킬의 구체적인 유형 */
