@@ -1,101 +1,154 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Components/StateComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
-#include "Kismet/KismetMathLibrary.h"
+#include "Components/DebugWidgetComponent.h"
+#include "AIController.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "BehaviorTree/BlackboardComponent.h"
 
-// Sets default values for this component's properties
-UStateComponent::UStateComponent() :m_CurHp(100.0)
+UStateComponent::UStateComponent() : m_CurHp(100.0)
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = false; // Tick은 가급적 끕니다
-	SetIsReplicatedByDefault(true); // 컴포넌트 복제 활성화
+    PrimaryComponentTick.bCanEverTick = false;
+    SetIsReplicatedByDefault(true);
 }
 
-
-// Called when the game starts
 void UStateComponent::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
+    OwnerChar = Cast<ACharacter>(GetOwner());
 
-	OwnerChar = Cast<ACharacter>(GetOwner());
+    // --- [추가] 시작 시 초기 직업 설정 및 스탯 계산 ---
+    // 기본 직업이 설정되어 있지 않다면 'Novice' 등으로 초기화
+    if (m_JobRowName.IsNone())
+    {
+        m_JobRowName = TEXT("Novice");
+    }
+
+    // 초기 (1,1,1,1) 속성 및 전투 능력치 계산 수행
+    RefreshFinalStats();
+
+    // 시작 시 체력을 최대 체력으로 설정
+    m_CurHp = m_TotalCombatStats.MaxHp;
+    OnRep_CurHp();
 }
 
 void UStateComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    // 기존 동기화 항목 유지
     DOREPLIFETIME(UStateComponent, m_CurHp);
+    DOREPLIFETIME(UStateComponent, m_AggroTarget);
 }
 
-void UStateComponent::SetBaseStats(const FST_Unit& UnitData)
+double UStateComponent::GetRequiredExpForLevel(int32 Level) const
 {
-    m_BaseStats.Attack = UnitData.Attack;
-    m_BaseStats.MaxHp = UnitData.MaxHp;
-    m_BaseStats.Defend = UnitData.Defend;
-    m_BaseStats.Speed = UnitData.Speed;
-
-    RecalculateTotalStats();
+    // [공식] 요구 경험치 = 100 * (현재레벨^2)
+    // 지수(2)를 높이면 후반 레벨업이 더 힘들어집니다.
+   return 5.0 * FMath::Pow((float)Level, 2.0f);
 }
 
-void UStateComponent::SetEquipStats(const FST_UnitStats& NewEquipStats)
+double UStateComponent::CalculateExpReward() const
 {
-    m_EquipStats = NewEquipStats;
-    RecalculateTotalStats();
+    // [공식] 보상 경험치 = 기초값 * (1.0 + (레벨 * 0.1))
+    // 즉, 레벨이 높은 유닛을 잡을수록 더 많은 경험치를 얻습니다.
+    return m_BaseExpReward * (1.0 + (m_CurrentLevel * 0.1));
 }
 
-void UStateComponent::RecalculateTotalStats()
+void UStateComponent::AddExp(double Amount)
 {
-    // 1. 기초 스탯과 장비 스탯 합산
-    m_TotalStats = m_BaseStats + m_EquipStats;
+    if (Amount <= 0.0) return;
+    m_CurrentExp += Amount;
 
-    // 2. 최대 체력이 변경됨에 따른 현재 체력 보정
-    m_CurHp = FMath::Min(m_CurHp, m_TotalStats.MaxHp);
+    double RequiredExp = GetRequiredExpForLevel(m_CurrentLevel);
 
-    // --- [화면 출력 로그 추가] ---
-    if (GEngine)
+    // 1. 레벨업 루프 시작
+    while (m_CurrentExp >= RequiredExp)
     {
-        FString ActorName = GetOwner() ? GetOwner()->GetName() : TEXT("Unknown");
-        FColor DisplayColor = FColor::Cyan; // 출력 색상 설정
-        float Duration = 5.0f;           // 화면 유지 시간 (5초)
-        uint64 Key = (uint64)GetOwner()->GetUniqueID(); // 동일 액터의 로그는 덮어쓰도록 키 지정
+        m_CurrentExp -= RequiredExp;
 
-        // 포맷팅된 문자열 생성
-        FString DebugHeader = FString::Printf(TEXT("=== [%s] Stats Updated ==="), *ActorName);
-        FString AttackLog = FString::Printf(TEXT("Attack : %.1f (Base:%.1f + Equip:%.1f)"),
-            m_TotalStats.Attack, m_BaseStats.Attack, m_EquipStats.Attack);
-        FString HpLog = FString::Printf(TEXT("MaxHP  : %.1f (Base:%.1f + Equip:%.1f)"),
-            m_TotalStats.MaxHp, m_BaseStats.MaxHp, m_EquipStats.MaxHp);
-        FString DefLog = FString::Printf(TEXT("Defend : %.1f (Base:%.1f + Equip:%.1f)"),
-            m_TotalStats.Defend, m_BaseStats.Defend, m_EquipStats.Defend);
+        // 현재 직업의 성장치를 누적
+        const FST_UnitJob* JobData = JobDataTable ? JobDataTable->FindRow<FST_UnitJob>(m_JobRowName, TEXT("")) : nullptr;
+        if (JobData)
+        {
+            m_AccumulatedAttributes = m_AccumulatedAttributes + JobData->GrowthAttributes;
+        }
 
-        // 화면에 출력 (키 값을 다르게 주면 여러 줄로 표시됩니다)
-        GEngine->AddOnScreenDebugMessage(Key + 0, Duration, DisplayColor, DebugHeader);
-        GEngine->AddOnScreenDebugMessage(Key + 1, Duration, FColor::White, AttackLog);
-        GEngine->AddOnScreenDebugMessage(Key + 2, Duration, FColor::White, HpLog);
-        GEngine->AddOnScreenDebugMessage(Key + 3, Duration, FColor::White, DefLog);
+        m_CurrentLevel++;
+
+        // --- [델리게이트 알림: 레벨업] ---
+        // 블루프린트에서 레벨업 이펙트나 사운드를 재생할 수 있습니다.
+        if (EventDispatcher_LevelUp.IsBound())
+        {
+            EventDispatcher_LevelUp.Broadcast(m_CurrentLevel);
+        }
+
+        RefreshFinalStats();
+
+        // 다음 레벨 요구치 갱신
+        RequiredExp = GetRequiredExpForLevel(m_CurrentLevel);
     }
 
-    // 콘솔 로그
-    UE_LOG(LogTemp, Warning, TEXT("[%s] Total Attack: %.2f"), *GetOwner()->GetName(), m_TotalStats.Attack);
+    // --- [델리게이트 알림: 경험치 변경] ---
+    // UI의 경험치 바(Progress Bar)를 업데이트하는 데 사용됩니다.
+    if (EventDispatcher_ExpChanged.IsBound())
+    {
+        EventDispatcher_ExpChanged.Broadcast(m_CurrentExp, RequiredExp);
+    }
 
-    OnRep_CurHp();
+    UpdateDebugWidget();
 }
 
-void UStateComponent::AddDamage(double Damage)
+void UStateComponent::RefreshFinalStats()
+{
+    // 최종 속성 = 기초(1,1,1,1) + 레벨업 누적 성장치
+    m_CurrentAttributes = m_OriginAttributes + m_AccumulatedAttributes;
+
+    UpdateCombatStats();
+}
+
+void UStateComponent::UpdateCombatStats()
+{
+    // [공식] 현재의 누적 속성(m_CurrentAttributes)을 기반으로 본체 전투력 계산
+    FST_CombatStats NewBase;
+    NewBase.Attack = (m_CurrentAttributes.Strength * 1.0) + (m_CurrentAttributes.Agility * 0.2);
+    NewBase.MaxHp = (m_CurrentAttributes.Stamina * 10.0) + (m_CurrentAttributes.Strength * 2.0);
+    NewBase.Defend = (m_CurrentAttributes.Agility * 1.2);
+    NewBase.Speed = 500.0 + (m_CurrentAttributes.Agility * 0.1);
+
+    m_BaseCombatStats = NewBase;
+
+    // 본체 전투력이 바뀌었으니 최종 스탯도 다시 계산
+    RecalculateTotalStats();
+}
+
+void UStateComponent::ChangeJob(FName NewJobRowName)
+{
+    // 전직해도 지금까지 쌓인 m_AccumulatedAttributes는 유지됨
+    m_JobRowName = NewJobRowName;
+}
+
+void UStateComponent::AddDamage(AController* EventInstigator, double Damage)
 {
     if (IsDeath() || GetOwnerRole() != ROLE_Authority) return;
 
-    // 3. m_MaxHp 대신 m_TotalStats.MaxHp 사용
-    m_CurHp = FMath::Clamp(m_CurHp - Damage, 0.0, m_TotalStats.MaxHp);
-
+    m_CurHp = FMath::Clamp(m_CurHp - Damage, 0.0, m_TotalCombatStats.MaxHp);
     OnRep_CurHp();
 
     if (IsDeath())
     {
-        HandleDeath();
+        // 1. 가해자 식별 및 경험치 지급
+        if (EventInstigator && EventInstigator->GetPawn())
+        {
+            UStateComponent* KillerState = EventInstigator->GetPawn()->FindComponentByClass<UStateComponent>();
+            if (KillerState)
+            {
+                // 함수로 계산된 경험치 보상을 가해자에게 전달
+                double FinalXP = CalculateExpReward();
+                KillerState->AddExp(FinalXP);
+            }
+        }
+
+        HandleDeath(); //
     }
 }
 
@@ -104,35 +157,84 @@ bool UStateComponent::IsDeath() const
     return m_CurHp <= 0.0;
 }
 
+void UStateComponent::SetEquipCombatStats(const FST_CombatStats& NewEquipStats)
+{
+    // 1. 새로운 장비 수치 저장
+    m_EquipCombatStats = NewEquipStats;
+
+    // 2. 최종 스탯 재계산 호출
+    RecalculateTotalStats();
+}
+
+void UStateComponent::UpdateDebugWidget()
+{
+    // 1. [가드] 머리 위에 달린 디버그 위젯 컴포넌트 찾기
+    UDebugWidgetComponent* DebugComp = GetOwner()->FindComponentByClass<UDebugWidgetComponent>();
+    if (!DebugComp) return;
+
+    // 2. 출력할 문자열 생성 (레벨, 직업, 현재 속성 등)
+    TArray<FString> StatLogs;
+    StatLogs.Add(FString::Printf(TEXT("Lv.%d | %s"), m_CurrentLevel, *m_JobRowName.ToString()));
+    StatLogs.Add(FString::Printf(TEXT("STR:%.1f AGI:%.1f INT:%.1f"), m_CurrentAttributes.Strength, m_CurrentAttributes.Agility, m_CurrentAttributes.Intelligence));
+    StatLogs.Add(FString::Printf(TEXT("ATK:%.1f HP:%.1f/%.1f"), m_TotalCombatStats.Attack, m_CurHp, m_TotalCombatStats.MaxHp));
+
+    // 3. 위젯 컴포넌트에 전달하여 화면 갱신
+    DebugComp->UpdateLogList(StatLogs);
+}
+
 void UStateComponent::OnRep_CurHp()
 {
-    // HP 변경 이벤트 브로드캐스트
-    EventDispatcher_UpdateHp.Broadcast(m_CurHp, m_TotalStats.MaxHp);
+    EventDispatcher_UpdateHp.Broadcast(m_CurHp, m_TotalCombatStats.MaxHp);
+}
+
+void UStateComponent::RecalculateTotalStats()
+{
+    // [합산] 본체(Attributes 기반) + 장비(Item 기반)
+    // ProjectRTSTypes.h에 정의한 operator+ 가 여기서 사용됩니다.
+    m_TotalCombatStats = m_BaseCombatStats + m_EquipCombatStats;
+
+    // 최대 체력 변경에 따른 현재 HP 보정 및 동기화
+    m_CurHp = FMath::Min(m_CurHp, m_TotalCombatStats.MaxHp);
+    OnRep_CurHp();
+
+    // 장비 장착/해제 시 위젯 및 로그 갱신
+    UpdateDebugWidget();
+
+    if (GEngine)
+    {
+        uint64 Key = (uint64)GetOwner()->GetUniqueID() + 10;
+        FString Msg = FString::Printf(TEXT("[%s] Total ATK: %.1f (Item: +%.1f)"),
+            *GetOwner()->GetName(), m_TotalCombatStats.Attack, m_EquipCombatStats.Attack);
+        GEngine->AddOnScreenDebugMessage(Key, 2.0f, FColor::Cyan, Msg);
+    }
 }
 
 void UStateComponent::HandleDeath()
 {
-    // 사망 이벤트 호출
+    // 1. 블랙보드 값 갱신 (AI에게 죽었음을 알림)
+    if (AAIController* AICon = Cast<AAIController>(OwnerChar->GetController()))
+    {
+        if (UBlackboardComponent* BB = AICon->GetBlackboardComponent())
+        {
+            BB->SetValueAsBool(TEXT("bIsDead"), true);
+        }
+
+        // 현재 경로 탐색 중지
+        AICon->StopMovement();
+    }
+
+    // 2. 이동 컴포넌트 비활성화 (물리적 정지)
+    if (UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement())
+    {
+        MoveComp->StopMovementImmediately();
+        MoveComp->DisableMovement(); // MOVE_None 상태로 변경
+    }
+
     EventDispatcher_EventDeath.Broadcast();
-
-    // 일정 시간 후 파괴 예약 (예: 3초)
     GetWorld()->GetTimerManager().SetTimer(DestroyTimerHandle, this, &UStateComponent::DestroyDelay, 3.0f, false);
-}
-
-void UStateComponent::UpdateUnitData(const FST_Unit& NewData)
-{
-    // 데이터 테이블의 구조체 값을 실제 컴포넌트 변수에 반영 
-    m_CurHp = m_TotalStats.MaxHp;
-
-	SetBaseStats(NewData); // BaseStats 업데이트 및 TotalStats 재계산
-
-    OnRep_CurHp();
 }
 
 void UStateComponent::DestroyDelay()
 {
-    if (GetOwner())
-    {
-        GetOwner()->Destroy();
-    }
+    if (GetOwner()) GetOwner()->Destroy();
 }

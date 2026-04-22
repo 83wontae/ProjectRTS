@@ -136,126 +136,138 @@ struct FST_Weapon : public FTableRowBase
 };
 
 /** 유닛 기초 데이터 ＊*/
+/** 유닛 기초 데이터 (DT_Unit용) */
 USTRUCT(BlueprintType)
 struct FST_Unit : public FTableRowBase
 {
     GENERATED_BODY()
 
-    // 생성자를 통한 기본값 설정
     FST_Unit()
-        : Name(TEXT("New Unit"))
-        , UnitClass(nullptr)
-        , UnitType(EUnitType::None) // 프로젝트에 정의된 기본값 사용
-        , HeadPart(nullptr)
-        , BodyPart(nullptr)
-        , AttackRange(250.0f)      // 근접 기본 사거리
-        , Attack(10.0)
-        , Defend(0.0)
-        , MaxHp(100.0)
-        , Speed(500.0)            // 기본 이동 속도
-        , DetectionRange(2000.0f)  // 기본 인지 범위
-    {
-    }
+        : Name(TEXT("New Unit")), UnitClass(nullptr), UnitJobRowName("Novice")
+        , AttackRange(200.0f), DetectionRange(1500.0f)
+    {}
 
+    // --- [메타 데이터] ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
     FString Name;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
     TSubclassOf<AActor> UnitClass;
 
+    // --- [직업 설정] ---
+    // 이제 수치를 직접 적지 않고, 이 Job에 설정된 BaseStats을 가져다 씁니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
-    EUnitType UnitType;
+    FName UnitJobRowName;
 
+    // --- [외형 데이터] ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Parts")
     class USkeletalMesh* HeadPart;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Parts")
     class USkeletalMesh* BodyPart;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
+    // --- [AI/전투 설정] ---
+    // 사거리는 '능력치'라기보다 유닛의 '특성(궁수, 전사)'에 가깝기 때문에 여기 둡니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
     double AttackRange;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
-    double Attack;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
-    double Defend;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
-    double MaxHp;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
-    double Speed;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Stats")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
     float DetectionRange;
 };
 
-/** 유닛의 종합 스탯 구조체 */
 USTRUCT(BlueprintType)
-struct FST_UnitStats
+struct FST_Attributes : public FTableRowBase
 {
     GENERATED_BODY()
 
-    // --- [레벨 시스템] ---
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level")
-    int32 Level = 1;
+    // 1. 기본 생성자 (언리얼 시스템 및 초기화를 위해 필수)
+    FST_Attributes()
+        : Strength(0.0), Agility(0.0), Intelligence(0.0), Stamina(0.0) {}
 
-    // --- [기본 주요 스탯 (Primary Attributes)] ---
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
-    double Strength = 0.0;      // 힘: 물리 공격력, 최대 체력에 영향
+    // 2. 4개의 인자를 받는 생성자 추가 (에러 해결 핵심)
+    FST_Attributes(double InStr, double InAgi, double InInt, double InSta)
+        : Strength(InStr), Agility(InAgi), Intelligence(InInt), Stamina(InSta) {}
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
-    double Agility = 0.0;       // 민첩: 공격 속도, 이동 속도, 방어력에 영향
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Strength = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Agility = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Intelligence = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Stamina = 0.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
-    double Intelligence = 0.0;  // 지능: 스킬 데미지, 마나량에 영향
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Primary")
-    double Stamina = 0.0;       // 스테미너: 최대 체력, 행동력에 영향
-
-    // --- [파생 전투 스탯 (Derived Stats)] ---
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
-    double Attack = 0.0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
-    double MaxHp = 0.0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
-    double Defend = 0.0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Derived")
-    double Speed = 0.0;
-
-    // 더하기 연산자 오버로딩 (아이템 장착 시나 레벨업 보너스 합산용)
-    FST_UnitStats operator+(const FST_UnitStats& Other) const
+    // + 연산자 오버로딩 수정
+    FST_Attributes operator+(const FST_Attributes& Other) const
     {
-        FST_UnitStats Result;
-        Result.Level = Level + Other.Level;
+        FST_Attributes Result;
         Result.Strength = Strength + Other.Strength;
         Result.Agility = Agility + Other.Agility;
         Result.Intelligence = Intelligence + Other.Intelligence;
         Result.Stamina = Stamina + Other.Stamina;
+        return Result;
+    }
+};
 
+USTRUCT(BlueprintType)
+struct FST_CombatStats : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Attack = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double MaxHp = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Defend = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Speed = 0.0;
+
+    // --- [추가] 더하기 연산자 오버로딩 ---
+    FST_CombatStats operator+(const FST_CombatStats& Other) const
+    {
+        FST_CombatStats Result;
         Result.Attack = Attack + Other.Attack;
-        Result.MaxHp = MaxHp + Other.MaxHp;
         Result.Defend = Defend + Other.Defend;
+        Result.MaxHp = MaxHp + Other.MaxHp;
         Result.Speed = Speed + Other.Speed;
         return Result;
     }
 };
 
-/** 유닛의 직업 종류 */
-UENUM(BlueprintType)
-enum class EUnitJob : uint8
+USTRUCT(BlueprintType)
+struct FST_UnitData
 {
-    None		UMETA(DisplayName = "None"),        // 시스템 에러 체크용
-	Novice		UMETA(DisplayName = "Novice"),      // 견습생 (초기 직업)
-    Warrior		UMETA(DisplayName = "Warrior"),     // 전사
-	Mage		UMETA(DisplayName = "Mage"),        // 마법사
-	Rogue		UMETA(DisplayName = "Rogue"),       // 도적
-	Priest		UMETA(DisplayName = "Priest"),      // 성직자
-    MAX
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere) int32 Level = 1;
+    UPROPERTY(VisibleAnywhere) double CurrentExp = 0.0;
+
+    // 순수 속성 (힘, 민, 지...)
+    UPROPERTY(EditAnywhere) FST_Attributes Attributes;
+
+    // 최종 전투력 (계산 결과)
+    UPROPERTY(VisibleAnywhere) FST_CombatStats FinalStats;
+};
+
+/** 직업의 모든 정보를 담는 구조체 */
+USTRUCT(BlueprintType)
+struct FST_UnitJob : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Info")
+    FText JobDisplayName; // 화면에 표시될 이름 (예: "전사", "Warrior")
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Info")
+    class UTexture2D* JobIcon; // UI용 아이콘
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Info")
+    FString JobDescription; // 직업 설명
+
+    // --- [초기 스탯] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Stats")
+    FST_Attributes BaseAttributes; // 레벨 1일 때의 기본 능력치
+
+    // --- [성장 수치] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Growth Stats")
+    FST_Attributes GrowthAttributes; // 레벨업 시 추가되는 능력치
+
+    // --- [시작 스킬] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skills")
+    TArray<FName> StartingSkills; // 태어날 때부터 가지고 있는 스킬 목록
 };
 
 /** 직업별 레벨업 성장 수치 데이터 */

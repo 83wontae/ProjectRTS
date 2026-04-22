@@ -137,36 +137,26 @@ void UEquipComponent::UpdateTotalEquipStats()
 	UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
 	if (!StateComp) return;
 
-	// 1. [Safety] 유닛 기본 데이터(Base)부터 다시 로드해서 State에 던져줍니다.
-	// m_UnitRowName을 기준으로 항상 최신 베이스 스탯을 보장합니다.
-	if (UnitTable && !m_UnitRowName.IsNone())
-	{
-		if (const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT("")))
-		{
-			StateComp->SetBaseStats(*UnitData);
-		}
-	}
-
 	// 2. 장비 추가 스탯(Equip) 계산 시작
-	FST_UnitStats NewEquipStats;
+	FST_CombatStats NewEquipCombat;
 
 	// 오른손 무기 공격력 합산
 	if (WeaponTable && !m_RightWeaponName.IsNone())
 	{
 		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("")))
-			NewEquipStats.Attack += Data->AttackPower;
+			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
 	// 왼손 무기 공격력 합산
 	if (WeaponTable && !m_LeftWeaponName.IsNone())
 	{
 		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("")))
-			NewEquipStats.Attack += Data->AttackPower;
+			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
 	// 3. 최종적으로 계산된 장비 보너스를 State에 주입
 	// StateComponent 내부에서 자동으로 RecalculateTotalStats()가 실행됩니다.
-	StateComp->SetEquipStats(NewEquipStats);
+	StateComp->SetEquipCombatStats(NewEquipCombat);
 }
 
 const FST_Unit* UEquipComponent::GetUnitData(FName InRowName) const

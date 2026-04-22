@@ -55,7 +55,7 @@ float ARtsUnitCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dama
 
     if (StateComp)
     {
-        StateComp->AddDamage((double)ActualDamage);
+        StateComp->AddDamage(EventInstigator, (double)ActualDamage);
     }
 
     return ActualDamage;
@@ -127,7 +127,7 @@ void ARtsUnitCharacter::HandleUnitBodyUpdate(const FST_Unit& UnitData)
     // 스탯 반영
     if (GetCharacterMovement())
     {
-        GetCharacterMovement()->MaxWalkSpeed = UnitData.Speed;
+        GetCharacterMovement()->MaxWalkSpeed = 300.0f;
     }
 }
 
@@ -155,7 +155,7 @@ void ARtsUnitCharacter::UpdateArmorMesh(EEquipType Type, USkeletalMesh* NewMesh)
 
 int32 ARtsUnitCharacter::GetFaction_Implementation() const
 {
-    return StateComp ? StateComp->m_Faction : -1;
+    return StateComp ? StateComp->GetFaction() : -1;
 }
 
 bool ARtsUnitCharacter::IsRiding_Implementation() const

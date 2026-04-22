@@ -1,117 +1,153 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Global/ProjectRTSTypes.h" // 이전에 만든 구조체 헤더 포함
+#include "Global/ProjectRTSTypes.h"
 #include "StateComponent.generated.h"
 
-// 이벤트 디스패처 선언 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateHp, double, CurHp, double, MaxHp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEventDeath);
+/** 경험치 변경 알림 (현재 경험치, 필요 경험치) */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, double, CurrentExp, double, RequiredExp);
+/** 레벨업 알림 (새로운 레벨) */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTRTS_API UStateComponent : public UActorComponent
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
-public:	
-	// Sets default values for this component's properties
-	UStateComponent();
+public:
+    UStateComponent();
 
 protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void BeginPlay() override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-    /** 최종 스탯 전체를 반환 */
-    UFUNCTION(BlueprintPure, Category = "RTS|State")
-    FST_UnitStats GetTotalStats() const { return m_TotalStats; }
+    /** --- [경험치 및 성장 시스템] --- */
 
-    /** 유닛의 현재 체력 최대치를 반환합니다. */
-    UFUNCTION(BlueprintPure, Category = "RTS|State")
-    double GetMaxHp() const { return m_TotalStats.MaxHp; }
+    /** 처치 시 지급될 기초 경험치 (기획 수치) */
+    UPROPERTY(EditAnywhere, Category = "RTS|State")
+    double m_BaseExpReward = 1.0f;
 
-    /** 유닛의 현재 공격력을 반환합니다. */
-    UFUNCTION(BlueprintPure, Category = "RTS|State")
-    double GetTotalAttack() const { return m_TotalStats.Attack; }
+    /** 특정 레벨에서 다음 레벨로 가기 위한 요구 경험치 계산 */
+    UFUNCTION(BlueprintPure, Category = "RTS|Level")
+    double GetRequiredExpForLevel(int32 Level) const;
 
-    /** 기초 스탯 설정 */
-    void SetBaseStats(const FST_Unit& UnitData);
+    /** 이 유닛이 처치되었을 때 가해자에게 줄 경험치 계산 */
+    UFUNCTION(BlueprintPure, Category = "RTS|Level")
+    double CalculateExpReward() const;
 
-    /** 장비 추가 스탯 설정 */
-    void SetEquipStats(const FST_UnitStats& NewEquipStats);
+    UFUNCTION(BlueprintCallable, Category = "RTS|Level")
+    void AddExp(double Amount);
 
-private:
-    /** 최종 수치 재계산 */
-    void RecalculateTotalStats();
+    UFUNCTION(BlueprintCallable, Category = "RTS|Level")
+    void ChangeJob(FName NewJobRowName);
 
-private:
-    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
-    FST_UnitStats m_BaseStats;  // 기초 (Unit Data)
+    void RefreshFinalStats();
+    void UpdateCombatStats();
 
-    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
-    FST_UnitStats m_EquipStats; // 장비 보너스
-
-    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
-    FST_UnitStats m_TotalStats; // 최종 합산 (Base + Equip)
-
-public:
-    /** 데미지를 입히는 함수 */
+    /** --- [기존 전투 및 타겟 시스템] --- */
     UFUNCTION(BlueprintCallable, Category = "RTS|State")
-    void AddDamage(double Damage);
+    void AddDamage(AController* EventInstigator, double Damage);
 
-    /** 사망 여부 확인 */
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     bool IsDeath() const;
 
-    /** 데이터 테이블 정보를 기반으로 스탯 업데이트  */
-    UFUNCTION(BlueprintCallable, Category = "RTS|State")
-    void UpdateUnitData(const FST_Unit& NewData);
-
-    /** 현재 HP 복제 시 실행될 함수 [cite: 1819, 2098-2099] */
-    UFUNCTION()
-    void OnRep_CurHp();
-
-    /** 타겟 설정 함수 */
     UFUNCTION(BlueprintCallable, Category = "RTS|State")
     void SetAggroTarget(AActor* NewTarget) { m_AggroTarget = NewTarget; }
 
-    /** 타겟 가져오기 함수 */
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     AActor* GetAggroTarget() const { return m_AggroTarget.Get(); }
 
-protected:
-    /** 사망 시 처리 로직 **/
-    void HandleDeath();
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    int32 GetFaction() const { return m_Faction; }
 
-    /** 일정 시간 후 액터 파괴 **/
-    void DestroyDelay();
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetTotalAttack() const { return m_TotalCombatStats.Attack; }
+
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetCurrentHp() const { return m_CurHp; }
+
+    UFUNCTION(BlueprintPure, Category = "RTS|State")
+    double GetMaxHp() const { return m_TotalCombatStats.MaxHp; }
+
+    // 장비 컴포넌트에서 무기/방어구 수치가 바뀔 때 호출합니다.
+    UFUNCTION(BlueprintCallable, Category = "RTS|State")
+    void SetEquipCombatStats(const FST_CombatStats& NewEquipStats);
+
+    /** 스탯 정보를 머리 위 위젯에 갱신하는 함수 */
+    void UpdateDebugWidget();
+
+private:
+    // [근본] 모든 유닛이 동일하게 시작하는 기초 값 (1.0)
+    const FST_Attributes m_OriginAttributes = FST_Attributes(1.0, 1.0, 1.0, 1.0);
+
+    // [성장] 레벨업 시 현재 직업의 성장치가 누적되는 변수
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    FST_Attributes m_AccumulatedAttributes;
+
+    // [최종 속성] Origin + Accumulated (순수 체급)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_Attributes m_CurrentAttributes;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    int32 m_CurrentLevel = 1;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    double m_CurrentExp = 0.0;
+
+	UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    FName m_JobRowName;
+
+    // Attributes(힘,민,지)에서 계산된 순수 본체 능력치
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_CombatStats m_BaseCombatStats;
+
+    // 아이템으로 추가된 능력치 (SetEquipCombatStats로 업데이트됨)
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_CombatStats m_EquipCombatStats;
+
+    UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
+    FST_CombatStats m_TotalCombatStats;
+
+    void RecalculateTotalStats();
 
 public:
-    UPROPERTY(ReplicatedUsing = OnRep_CurHp, BlueprintReadWrite, Category = "RTS|State")
-    double m_CurHp;
-
-    // --- 팀 시스템 변수 및 함수 ---
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
-    int32 m_Faction;
-
     UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
     FOnUpdateHp EventDispatcher_UpdateHp;
 
     UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
     FOnEventDeath EventDispatcher_EventDeath;
 
+    /** 블루프린트에서 바인딩 가능한 이벤트 디스패처 */
+    UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
+    FOnExpChanged EventDispatcher_ExpChanged;
+
+    UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")
+    FOnLevelUp EventDispatcher_LevelUp;
+
 protected:
-    /** 현재 추적 및 공격 중인 대상 (어그로 타겟) */
+
+    UPROPERTY(ReplicatedUsing = OnRep_CurHp, BlueprintReadWrite, Category = "RTS|State")
+    double m_CurHp;
+
+    /** [기존 팀 시스템] */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+    int32 m_Faction;
+
+    /** [기존 어그로 타겟] */
     UPROPERTY(Replicated, BlueprintReadWrite, Category = "RTS|State")
     TWeakObjectPtr<AActor> m_AggroTarget;
-    
-private:
-    UPROPERTY()
-    class ACharacter* OwnerChar;
 
+    UPROPERTY(EditAnywhere, Category = "RTS|Data")
+    class UDataTable* JobDataTable;
+
+private:
+    UPROPERTY() class ACharacter* OwnerChar;
     FTimerHandle DestroyTimerHandle;
+    void HandleDeath();
+    void DestroyDelay();
+    UFUNCTION() void OnRep_CurHp();
 };
