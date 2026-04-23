@@ -66,7 +66,7 @@ public:
     class USkeletalMeshComponent* HorseMesh;
 
 protected:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data", meta = (ExposeOnSpawn = "true"))
     FName UnitRowName;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Selection")

@@ -5,6 +5,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/SkillComponent.h"
+#include "Interface/UnitInterface.h"
 
 UBTTask_Attack::UBTTask_Attack()
 {
@@ -15,31 +16,33 @@ UBTTask_Attack::UBTTask_Attack()
 EBTNodeResult::Type UBTTask_Attack::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	AAIController* AIC = OwnerComp.GetAIOwner();
-	if (!AIC || !AIC->GetPawn())
-	{
-		UE_LOG(LogTemp, Error, TEXT("[BTTask_Attack] Failed: Controller or Pawn is null."));
-		return EBTNodeResult::Failed;
-	}
+	if (!AIC || !AIC->GetPawn()) return EBTNodeResult::Failed;
 
 	APawn* ControlledPawn = AIC->GetPawn();
-	USkillComponent* SkillComp = ControlledPawn->FindComponentByClass<USkillComponent>();
-	if (!SkillComp)
+
+	// --- [1. 본인 사망 체크] ---
+	if (ControlledPawn->Implements<UUnitInterface>() && IUnitInterface::Execute_IsDeath(ControlledPawn))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] BTTask_Attack: SkillComponent not found!"), *ControlledPawn->GetName());
 		return EBTNodeResult::Failed;
 	}
 
-	// 1. 블랙보드에서 타겟 가져오기
+	USkillComponent* SkillComp = ControlledPawn->FindComponentByClass<USkillComponent>();
+	if (!SkillComp) return EBTNodeResult::Failed;
+
+	// 블랙보드에서 타겟 가져오기
 	AActor* Target = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetActorKey.SelectedKeyName));
-	FString TargetName = Target ? Target->GetName() : TEXT("NULL");
 
-	// 2. 공격 실행
+	// --- [2. 타겟 유효성 및 사망 체크] ---
+	// 타겟이 없거나 이미 죽었다면 공격을 시작하지 않습니다.
+	if (!Target || (Target->Implements<UUnitInterface>() && IUnitInterface::Execute_IsDeath(Target)))
+	{
+		return EBTNodeResult::Failed;
+	}
+
 	bool bSuccess = SkillComp->ExecuteBestAttack(Target);
-
 	if (bSuccess)
 	{
-		// 공격 애니메이션 시작 성공 시 노드 종료 (애니메이션 루프는 BT에서 제어)
-		return EBTNodeResult::Succeeded;
+		return EBTNodeResult::InProgress; // 지연 태스크로 전환하여 Tick에서 감시
 	}
 
 	return EBTNodeResult::Failed;
@@ -50,24 +53,33 @@ void UBTTask_Attack::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemo
 	AAIController* AIC = OwnerComp.GetAIOwner();
 	if (!AIC || !AIC->GetPawn())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[BTTask_Attack] Tick Failed: Pawn Lost."));
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
 
-	USkillComponent* SkillComp = AIC->GetPawn()->FindComponentByClass<USkillComponent>();
+	APawn* ControlledPawn = AIC->GetPawn();
 
-	if (SkillComp)
+	// --- [3. 공격 도중 본인 사망 체크] ---
+	if (ControlledPawn->Implements<UUnitInterface>() && IUnitInterface::Execute_IsDeath(ControlledPawn))
 	{
-		// [로그 추가] 매 프레임 상태를 확인하고 있는지 (너무 자주 찍힐 수 있으므로 주의)
-		// UE_LOG(LogTemp, Verbose, TEXT("[%s] TickTask: Waiting for bIsAttacking to be false..."), *AIC->GetPawn()->GetName());
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
 
-		if (!SkillComp->bIsAttacking)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[%s] BTTask_Attack: Skill finished. Finishing Latent Task with Success."), *AIC->GetPawn()->GetName());
+	// --- [4. 공격 도중 타겟 사망 체크] ---
+	// 휘두르는 도중에 타겟이 먼저 죽었다면 태스크를 중단하거나 성공으로 마무리합니다.
+	AActor* Target = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetActorKey.SelectedKeyName));
+	if (!Target || (Target->Implements<UUnitInterface>() && IUnitInterface::Execute_IsDeath(Target)))
+	{
+		// 타겟이 죽었으므로 공격을 더 지속할 이유가 없음
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		return;
+	}
 
-			// 태스크 성공 종료 알림
-			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
-		}
+	USkillComponent* SkillComp = ControlledPawn->FindComponentByClass<USkillComponent>();
+	if (SkillComp && !SkillComp->bIsAttacking)
+	{
+		// 정상적으로 공격 애니메이션이 끝난 경우
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}
 }

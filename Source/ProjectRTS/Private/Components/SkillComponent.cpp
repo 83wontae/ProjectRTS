@@ -337,28 +337,24 @@ void USkillComponent::ExecuteSkillEffect()
 
 void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc)
 {
-	if (!SkillData->ProjectileClass || !OwnerChar) return;
+	// 1. 가드: 하나라도 없으면 바로 퇴근
+	if (!Target || !SkillData->ProjectileClass || !OwnerChar) return;
 
-	FRotator SpawnRotation = OwnerChar->GetActorRotation();
-
-	if (Target)
-	{
-		SpawnRotation = (Target->GetActorLocation() - MuzzleLoc).Rotation();
-	}
+	// 2. 이미 위에서 Target이 있는 게 확인됐으니, if 없이 바로 방향 계산
+	FRotator SpawnRotation = (Target->GetActorLocation() - MuzzleLoc).Rotation();
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = OwnerChar;
 	SpawnParams.Instigator = OwnerChar;
 
-	// 발사체 스폰 (Deferred Spawn 권장)
-	// 발사체 클래스 내부에서 타겟 정보와 데미지를 받아 처리하도록 설계합니다.
 	AActor* Projectile = GetWorld()->SpawnActor<AActor>(SkillData->ProjectileClass, MuzzleLoc, SpawnRotation, SpawnParams);
 
-	if (Projectile->Implements<UProjectileInterface>())
+	// 3. 인터페이스 셋업
+	if (Projectile && Projectile->Implements<UProjectileInterface>())
 	{
-		double FinalAtk = OwnerChar->FindComponentByClass<UStateComponent>()->GetTotalAttack();
+		UStateComponent* StateComp = OwnerChar->FindComponentByClass<UStateComponent>();
+		double FinalAtk = StateComp ? StateComp->GetTotalAttack() : 0.0;
 
-		// 화살이든, 레이저든, 검기든 똑같이 이 함수만 호출하면 끝!
 		IProjectileInterface::Execute_SetupProjectile(Projectile, OwnerChar, Target, FinalAtk);
 	}
 }
