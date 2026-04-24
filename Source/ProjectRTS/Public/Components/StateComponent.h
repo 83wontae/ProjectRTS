@@ -150,4 +150,15 @@ private:
     void HandleDeath();
     void DestroyDelay();
     UFUNCTION() void OnRep_CurHp();
+
+public:
+    /** --- [저장 및 로드 시스템] --- */
+
+    /** 현재 유닛의 상태를 저장용 구조체로 추출합니다. */
+    UFUNCTION(BlueprintCallable, Category = "RTS|Save")
+    FST_UnitSaveData GetSaveData();
+
+    /** 저장된 데이터를 기반으로 유닛의 상태(레벨, 누적 속성 등)를 복구합니다. */
+    UFUNCTION(BlueprintCallable, Category = "RTS|Save")
+    void LoadFromSaveData(const FST_UnitSaveData& InData);
 };

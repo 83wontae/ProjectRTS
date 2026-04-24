@@ -5,6 +5,7 @@
 #include "AIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Core/RtsUnitCharacter.h"
 
 UStateComponent::UStateComponent() : m_CurHp(100.0)
 {
@@ -237,4 +238,51 @@ void UStateComponent::HandleDeath()
 void UStateComponent::DestroyDelay()
 {
     if (GetOwner()) GetOwner()->Destroy();
+}
+
+/** --- [저장 및 로드 시스템] --- */
+
+FST_UnitSaveData UStateComponent::GetSaveData()
+{
+    FST_UnitSaveData SaveData;
+
+    // 1. 유닛 종류 식별 (Owner 액터에서 RowName 추출)
+    // UnitRowName이 protected라면 RtsUnitCharacter에 Getter를 추가하거나, 
+    // 아래처럼 직접 접근이 가능한 구조여야 합니다.
+    if (ARtsUnitCharacter* RtsChar = Cast<ARtsUnitCharacter>(GetOwner()))
+    {
+        // RtsChar 내부의 UnitRowName을 저장합니다.
+        // (참고: RtsUnitCharacter.h에 UnitRowName Getter가 있다고 가정)
+        // SaveData.UnitRowName = RtsChar->GetUnitRowName(); 
+    }
+
+    // 2. 성장 데이터 복사
+    SaveData.Level = m_CurrentLevel;
+    SaveData.CurrentExp = m_CurrentExp;
+    SaveData.CurrentJob = m_JobRowName;
+
+    // 3. 무한 성장의 핵심인 누적 속성치 저장
+    SaveData.AccumulatedAttributes = m_AccumulatedAttributes;
+
+    return SaveData;
+}
+
+void UStateComponent::LoadFromSaveData(const FST_UnitSaveData& InData)
+{
+    // 1. 데이터 주입
+    m_CurrentLevel = InData.Level;
+    m_CurrentExp = InData.CurrentExp;
+    m_JobRowName = InData.CurrentJob;
+    m_AccumulatedAttributes = InData.AccumulatedAttributes;
+
+    // 2. 주입된 속성을 바탕으로 최종 스탯 및 전투 능력치 재계산
+    // 이 함수를 호출해야 m_BaseCombatStats와 m_TotalCombatStats가 갱신됩니다.
+    RefreshFinalStats();
+
+    // 3. 체력 복구 (최대 체력으로 설정하거나 저장된 체력치가 있다면 그것으로 설정)
+    m_CurHp = m_TotalCombatStats.MaxHp;
+    OnRep_CurHp();
+
+    // 4. UI 및 디버그 정보 갱신
+    UpdateDebugWidget();
 }
