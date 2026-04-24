@@ -184,10 +184,12 @@ void UEquipComponent::OnRep_RightWeaponName()
 {
 	if (!WeaponTable) return;
 
+	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
+	HandleWeaponAttachment(m_RightWeaponName, EWeaponSlot::RightHand);
+
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT(""));
 	if (Data)
 	{
-		// 구조체 데이터를 이벤트로 전달 (기존 UI 로직 호환)
 		OnUpdateWeapon.Broadcast(EWeaponSlot::RightHand, *Data);
 	}
 }
@@ -196,10 +198,12 @@ void UEquipComponent::OnRep_LeftWeaponName()
 {
 	if (!WeaponTable) return;
 
+	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
+	HandleWeaponAttachment(m_LeftWeaponName, EWeaponSlot::LeftHand);
+
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT(""));
 	if (Data)
 	{
-		// 구조체 데이터를 이벤트로 전달 (기존 UI 로직 호환)
 		OnUpdateWeapon.Broadcast(EWeaponSlot::LeftHand, *Data);
 	}
 }
@@ -462,6 +466,32 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 			*WeaponData.SkillName.ToString(), *WeaponData.SkillNameRide.ToString());
 		GEngine->AddOnScreenDebugMessage(Key, 3.0f, FColor::Green, SkillMsg);
 	}
+}
+
+void UEquipComponent::EquipToWeapon(FName WeaponName)
+{
+	// 서버 권한 및 유효성 확인
+	if (GetOwnerRole() != ROLE_Authority || WeaponName.IsNone() || !WeaponTable) return;
+
+	// 1. 무기 데이터 테이블에서 제약 조건 확인
+	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("EquipToWeapon"));
+	if (!WeaponData) return;
+
+	EWeaponSlot TargetSlot = EWeaponSlot::RightHand; // 기본값은 오른손
+
+	// 2. HandConstraint에 따른 슬롯 자동 결정
+	if (WeaponData->HandConstraint == EWeaponHandConstraint::ForceLeft ||
+		WeaponData->HandConstraint == EWeaponHandConstraint::Shield)
+	{
+		TargetSlot = EWeaponSlot::LeftHand;
+	}
+	else if (WeaponData->HandConstraint == EWeaponHandConstraint::ForceRight)
+	{
+		TargetSlot = EWeaponSlot::RightHand;
+	}
+
+	// 3. 결정된 슬롯으로 기존 장착 함수 호출
+	EquipWeaponByName(WeaponName, TargetSlot);
 }
 
 float UEquipComponent::GetAttackRange() const

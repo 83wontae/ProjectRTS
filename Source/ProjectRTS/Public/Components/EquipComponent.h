@@ -68,6 +68,12 @@ public:
 	/** 장착 로직 내부 처리 함수 */
 	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
 
+	/** * 무기 이름만으로 적절한 슬롯을 찾아 장착합니다.
+	 * 제약 조건(ForceLeft, ForceRight 등)에 따라 자동으로 손을 결정합니다.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void EquipToWeapon(FName WeaponName);
+
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	float GetAttackRange() const;
 
