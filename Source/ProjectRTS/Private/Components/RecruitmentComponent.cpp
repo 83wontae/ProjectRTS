@@ -32,6 +32,13 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
 
     RecruitedUnits.Add(NewUnit);
 
+    // --- [추가된 로직: 이벤트 전파] ---
+    // 구독 중인 모든 블루프린트나 C++ 클래스에 알림을 보냅니다.
+    if (OnUnitRecruited.IsBound())
+    {
+        OnUnitRecruited.Broadcast(NewUnit);
+    }
+
     UE_LOG(LogTemp, Log, TEXT("URecruitmentComponent: Unit [%s] added to roster. Total: %d"),
         *UnitRowName.ToString(), RecruitedUnits.Num());
 }

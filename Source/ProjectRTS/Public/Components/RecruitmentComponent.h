@@ -23,6 +23,12 @@ struct FST_RecruitUnit
     FName HandL; // 왼손 무기 RowName
 };
 
+/** * 유닛 고용 알림 이벤트 디스패처
+ * 고용된 유닛의 정보를 함께 전달합니다.
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitRecruited, const FST_RecruitUnit&, RecruitedUnit);
+
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTRTS_API URecruitmentComponent : public UActorComponent
 {
@@ -58,6 +64,12 @@ public:
      */
     UFUNCTION(BlueprintCallable, Category = "RTS|Recruitment")
     void SpawnRecruitedUnits(FName StartTag, float SpawnRadius = 500.0f);
+
+    /** * 블루프린트에서 바인딩 가능한 고용 이벤트
+     * 'AddUnitToRoster'가 성공적으로 호출되면 실행됩니다.
+     */
+    UPROPERTY(BlueprintAssignable, Category = "RTS|Recruitment|Events")
+    FOnUnitRecruited OnUnitRecruited;
 
 protected:
     /** 유닛 클래스 정보를 가져오기 위한 데이터 테이블 */
