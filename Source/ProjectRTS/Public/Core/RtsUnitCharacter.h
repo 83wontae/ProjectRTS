@@ -48,6 +48,8 @@ public:
     /** 실제 메시 컴포넌트의 SkeletalMesh를 교체하는 시각적 실행 함수 */
     void UpdateArmorMesh(EEquipType Type, class USkeletalMesh* NewMesh);
 
+	FName GetUnitRowName() const { return UnitRowName; }
+
 public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class UStateComponent* StateComp;

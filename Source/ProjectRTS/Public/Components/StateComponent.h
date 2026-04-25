@@ -154,11 +154,11 @@ private:
 public:
     /** --- [저장 및 로드 시스템] --- */
 
-    /** 현재 유닛의 상태를 저장용 구조체로 추출합니다. */
+    /** 유닛의 고용 정보와 성장 상태를 모두 포함한 통합 데이터를 반환합니다. */
     UFUNCTION(BlueprintCallable, Category = "RTS|Save")
-    FST_UnitSaveData GetSaveData();
+    FST_UnitSaveData GetFullSaveData();
 
-    /** 저장된 데이터를 기반으로 유닛의 상태(레벨, 누적 속성 등)를 복구합니다. */
+    /** 통합 데이터를 받아 유닛의 상태와 장비를 한 번에 복구합니다. */
     UFUNCTION(BlueprintCallable, Category = "RTS|Save")
-    void LoadFromSaveData(const FST_UnitSaveData& InData);
+    void LoadFromFullSaveData(const FST_UnitSaveData& InData);
 };

@@ -6,48 +6,61 @@
 #include "EngineUtils.h"
 #include "Core/RtsUnitCharacter.h"
 #include "Components/StateComponent.h"
+#include "Components/RecruitmentComponent.h"
 
 void URtsSaveSubsystem::SaveGame(const FString& SlotName, int32 UserIndex)
 {
-    // 1. 새로운 세이브 객체 생성
     URtsSaveGame* SaveGameObject = Cast<URtsSaveGame>(UGameplayStatics::CreateSaveGameObject(URtsSaveGame::StaticClass()));
     if (!SaveGameObject) return;
 
-    // 2. 월드 내 모든 ARtsUnitCharacter 탐색 및 데이터 수집
-    for (TActorIterator<ARtsUnitCharacter> It(GetWorld()); It; ++It)
+    // 1. 로컬 플레이어 컨트롤러와 고용 컴포넌트 찾기
+    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+    if (PC)
     {
-        ARtsUnitCharacter* Unit = *It;
-        if (Unit && Unit->StateComp && !Unit->IsDeath_Implementation()) // 살아있는 유닛만 저장
+        URecruitmentComponent* RecruitComp = PC->FindComponentByClass<URecruitmentComponent>();
+        if (RecruitComp)
         {
-            SaveGameObject->SaveData.RecruitedUnits.Add(Unit->StateComp->GetSaveData());
+            // 2. 컴포넌트의 리스트를 세이브 데이터로 복사
+            for (const FST_UnitSaveData& Unit : RecruitComp->GetRecruitedUnits())
+            {
+                FST_UnitSaveData SaveUnit;
+                SaveUnit.UnitRowName = Unit.UnitRowName;
+                SaveUnit.HandR = Unit.HandR;
+                SaveUnit.HandL = Unit.HandL;
+
+                SaveGameObject->SaveData.RecruitedUnits.Add(SaveUnit);
+            }
         }
     }
 
-    // 3. 기타 게임 데이터 저장 (자원 등)
-    // SaveGameObject->SaveData.Gold = CurrentGold;
-
-    // 4. 파일로 쓰기
+    // 3. 파일 저장
     UGameplayStatics::SaveGameToSlot(SaveGameObject, SlotName, UserIndex);
-    UE_LOG(LogTemp, Log, TEXT("Game Saved to Slot: %s"), *SlotName);
+    UE_LOG(LogTemp, Log, TEXT("Roster Saved! Total Units: %d"), SaveGameObject->SaveData.RecruitedUnits.Num());
 }
 
 void URtsSaveSubsystem::LoadGame(const FString& SlotName, int32 UserIndex)
 {
-    // 1. 파일 읽기
     URtsSaveGame* SaveGameObject = Cast<URtsSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex));
     if (!SaveGameObject) return;
 
-    // 2. 기존 유닛 제거 (새로 스폰하여 복구할 예정이므로)
-    for (TActorIterator<ARtsUnitCharacter> It(GetWorld()); It; ++It)
+    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+    if (PC)
     {
-        It->Destroy();
+        URecruitmentComponent* RecruitComp = PC->FindComponentByClass<URecruitmentComponent>();
+        if (RecruitComp)
+        {
+            // 기존 리스트 비우기
+            RecruitComp->ClearRoster();
+
+            // 세이브 파일의 데이터를 컴포넌트로 복구
+            for (const FST_UnitSaveData& SaveUnit : SaveGameObject->SaveData.RecruitedUnits)
+            {
+                RecruitComp->AddUnitToRoster(SaveUnit.UnitRowName, SaveUnit.HandR, SaveUnit.HandL);
+            }
+        }
     }
 
-    // 3. 저장된 데이터를 바탕으로 유닛 재생성
-    for (const FST_UnitSaveData& UnitData : SaveGameObject->SaveData.RecruitedUnits)
-    {
-        SpawnUnitFromSaveData(UnitData);
-    }
+    UE_LOG(LogTemp, Log, TEXT("Roster Loaded Successfully."));
 }
 
 void URtsSaveSubsystem::SpawnUnitFromSaveData(const FST_UnitSaveData& UnitData)

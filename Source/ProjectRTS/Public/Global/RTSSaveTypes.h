@@ -14,29 +14,29 @@ struct FST_UnitSaveData
 {
     GENERATED_BODY()
 
-    /** 유닛의 종류 (DT_Unit 키값) */
+    // 1. 기초 고용 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FName UnitRowName;
 
-    /** 현재 레벨 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FName HandR; // 오른손 무기
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FName HandL; // 왼손 무기
+
+    // 2. 실시간 성장 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     int32 Level = 1;
 
-    /** 현재 경험치 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     double CurrentExp = 0.0;
 
-    /** 현재 직업 (DT_Job 키값) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FName CurrentJob;
+    FName CurrentJob = TEXT("Novice");
 
-    /** 무한 성장의 핵심: 레벨업을 통해 쌓인 순수 속성치 */
+    /** 무한 성장의 핵심: 누적된 순수 속성치 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FST_Attributes AccumulatedAttributes;
-
-    /** 유닛의 별명이나 고유 이름 (필요 시) */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FString CustomName;
 };
 
 /** * 전체 게임 세이브 데이터 구조
