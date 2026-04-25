@@ -97,6 +97,9 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
 
         if (SpawnedUnit)
         {
+            // --- AI 컨트롤러 생성 및 빙의 ---
+            SpawnedUnit->SpawnDefaultController();
+
             // 5. 무기 장착 (EquipComponent 활용)
             if (SpawnedUnit->EquipComp)
             {
