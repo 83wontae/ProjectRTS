@@ -135,7 +135,7 @@ void UEquipComponent::EquipToUnitData(FName InUnitRowName)
 
 void UEquipComponent::UpdateTotalEquipStats()
 {
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 	if (WeaponTable == nullptr) return; // 데이터 테이블이 없으면 기본값 반환
 
 	UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
@@ -166,7 +166,7 @@ void UEquipComponent::UpdateTotalEquipStats()
 // --- OnRep  --- 
 void UEquipComponent::OnRep_UnitRowName()
 {
-	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 
 	if (!UnitTable || m_UnitRowName.IsNone()) return;
 
@@ -184,7 +184,7 @@ void UEquipComponent::OnRep_UnitRowName()
 void UEquipComponent::OnRep_RightWeaponName()
 {
 	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
 	if (!WeaponTable) return;
 
@@ -201,7 +201,7 @@ void UEquipComponent::OnRep_RightWeaponName()
 void UEquipComponent::OnRep_LeftWeaponName()
 {
 	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
 	if (!WeaponTable) return;
 
@@ -218,7 +218,7 @@ void UEquipComponent::OnRep_LeftWeaponName()
 void UEquipComponent::OnRep_ArmorHeadName()
 {
 	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
 
 	if (!ArmorTable) return;
 
@@ -233,7 +233,7 @@ void UEquipComponent::OnRep_ArmorHeadName()
 void UEquipComponent::OnRep_ArmorBodyName()
 {
 	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
 
 	if (!ArmorTable) return;
 
@@ -248,7 +248,7 @@ void UEquipComponent::OnRep_ArmorBodyName()
 void UEquipComponent::OnRep_ArmorHorseName()
 {
 	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
 
 	if (!ArmorTable) return;
 
@@ -272,7 +272,7 @@ void UEquipComponent::OnRep_BattleAnimType()
 void UEquipComponent::UpdateBattleAnimType()
 {
 	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
 	// 1. [가드 클로저] 서버 권한 및 데이터 테이블 유효성 확인
 	if (GetOwnerRole() != ROLE_Authority || !WeaponTable) return;
@@ -390,7 +390,7 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	if (!World) return;
 
 	const URtsGameSettings* GameSettings = GetDefault<URtsGameSettings>();
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
 	if (!WeaponTable || !WeaponClass) return;
 
@@ -494,7 +494,7 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 
 void UEquipComponent::EquipToWeapon(FName WeaponName)
 {
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
 	// 서버 권한 및 유효성 확인
 	if (GetOwnerRole() != ROLE_Authority || WeaponName.IsNone() || !WeaponTable) return;
@@ -522,10 +522,10 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 float UEquipComponent::GetAttackRange() const
 {
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 	if (WeaponTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
-	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
 	// 1. 우선순위: 오른손 무기 데이터 확인
@@ -566,7 +566,7 @@ float UEquipComponent::GetAttackRange() const
 
 float UEquipComponent::GetDetectionRange() const
 {
-	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
 	// 유닛 데이터 테이블에서 해당 유닛의 인지 범위를 가져옵니다.

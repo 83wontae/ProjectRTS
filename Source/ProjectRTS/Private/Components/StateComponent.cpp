@@ -22,7 +22,7 @@ void UStateComponent::BeginPlay()
 
     if (m_JobRowName.IsNone()) m_JobRowName = TEXT("Novice");
 
-	UDataTable* JobDataTable = RtsSettings::GetJobTable();
+	UDataTable* JobDataTable = RtsSettings::GetJobTable(GetOwner());
 	if (!JobDataTable) {
 		UE_LOG(LogTemp, Error, TEXT("[%s] StateComponent: JobDataTable is null! Please check RtsGameSettings."), *GetOwner()->GetName());
 		return;
@@ -56,7 +56,7 @@ void UStateComponent::AddExp(double Amount)
 {
     if (Amount <= 0.0) return;
 
-    UDataTable* JobDataTable = RtsSettings::GetJobTable();
+    UDataTable* JobDataTable = RtsSettings::GetJobTable(GetOwner());
     if (!JobDataTable) return;
 
     m_CurrentExp += Amount;

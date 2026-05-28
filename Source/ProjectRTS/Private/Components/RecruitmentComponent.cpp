@@ -34,7 +34,7 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
 
 void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadius)
 {
-    UDataTable* UnitDataTable = RtsSettings::GetUnitTable();
+    UDataTable* UnitDataTable = RtsSettings::GetUnitTable(GetOwner());
     if (!UnitDataTable) return;
 
     // 2. PlayerStart 찾기

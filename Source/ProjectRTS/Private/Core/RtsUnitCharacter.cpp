@@ -69,7 +69,7 @@ void ARtsUnitCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 
     FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 	if (!UnitTable) return;
 
     // UnitRowName이 바뀌었을 때 실시간 업데이트
@@ -92,7 +92,7 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
 
-    UDataTable* UnitTable = RtsSettings::GetUnitTable();
+    UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 	if (!UnitTable) return;
 
     // 1. 메시 포즈 동기화

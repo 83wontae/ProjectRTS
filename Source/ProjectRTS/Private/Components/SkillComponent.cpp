@@ -222,7 +222,7 @@ FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 	if (!WeaponTable) return NAME_None;
 
 	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
