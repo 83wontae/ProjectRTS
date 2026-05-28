@@ -62,9 +62,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	bool IsRideState() const { return !m_ArmorHorseName.IsNone(); }
 
-	/** 데이터 테이블 조회가 필요한 경우를 위해 데이터 반환 함수 제공 */
-	const FST_Unit* GetUnitData(FName InUnitRowName) const;
-
 	/** 장착 로직 내부 처리 함수 */
 	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
 
@@ -115,16 +112,6 @@ public:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ArmorHorseName, BlueprintReadWrite, Category = "RTS|Equip")
 	FName m_ArmorHorseName;
-
-	// --- 데이터 테이블 포인터 (에디터에서 할당) ---
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
-	class UDataTable* UnitTable;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
-	class UDataTable* WeaponTable;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data")
-	class UDataTable* ArmorTable;
 
 	UPROPERTY(ReplicatedUsing = OnRep_BattleAnimType, BlueprintReadWrite, Category = "RTS|Combat")
 	EBattleAnimType m_BattleAnimType;

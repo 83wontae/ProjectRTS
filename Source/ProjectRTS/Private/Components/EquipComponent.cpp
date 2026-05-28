@@ -7,6 +7,7 @@
 #include "Components/StateComponent.h"
 #include "Components/SkillComponent.h"
 #include "Interface/WeaponInterface.h"
+#include "Global/RtsGameSettings.h"
 
 // Sets default values for this component's properties
 UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
@@ -134,6 +135,9 @@ void UEquipComponent::EquipToUnitData(FName InUnitRowName)
 
 void UEquipComponent::UpdateTotalEquipStats()
 {
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	if (WeaponTable == nullptr) return; // 데이터 테이블이 없으면 기본값 반환
+
 	UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
 	if (!StateComp) return;
 
@@ -159,14 +163,11 @@ void UEquipComponent::UpdateTotalEquipStats()
 	StateComp->SetEquipCombatStats(NewEquipCombat);
 }
 
-const FST_Unit* UEquipComponent::GetUnitData(FName InRowName) const
-{
-	return UnitTable ? UnitTable->FindRow<FST_Unit>(InRowName, TEXT("")) : nullptr;
-}
-
 // --- OnRep  --- 
 void UEquipComponent::OnRep_UnitRowName()
 {
+	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+
 	if (!UnitTable || m_UnitRowName.IsNone()) return;
 
 	const FST_Unit* Data = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
@@ -182,6 +183,9 @@ void UEquipComponent::OnRep_UnitRowName()
 
 void UEquipComponent::OnRep_RightWeaponName()
 {
+	// 세팅 가져오기
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
@@ -196,6 +200,9 @@ void UEquipComponent::OnRep_RightWeaponName()
 
 void UEquipComponent::OnRep_LeftWeaponName()
 {
+	// 세팅 가져오기
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
@@ -210,6 +217,9 @@ void UEquipComponent::OnRep_LeftWeaponName()
 
 void UEquipComponent::OnRep_ArmorHeadName()
 {
+	// 세팅 가져오기
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+
 	if (!ArmorTable) return;
 
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHeadName, TEXT(""));
@@ -222,6 +232,9 @@ void UEquipComponent::OnRep_ArmorHeadName()
 
 void UEquipComponent::OnRep_ArmorBodyName()
 {
+	// 세팅 가져오기
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+
 	if (!ArmorTable) return;
 
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorBodyName, TEXT(""));
@@ -234,6 +247,9 @@ void UEquipComponent::OnRep_ArmorBodyName()
 
 void UEquipComponent::OnRep_ArmorHorseName()
 {
+	// 세팅 가져오기
+	UDataTable* ArmorTable = RtsSettings::GetArmorTable();
+
 	if (!ArmorTable) return;
 
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHorseName, TEXT(""));
@@ -255,6 +271,9 @@ void UEquipComponent::OnRep_BattleAnimType()
 
 void UEquipComponent::UpdateBattleAnimType()
 {
+	// 세팅 가져오기
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+
 	// 1. [가드 클로저] 서버 권한 및 데이터 테이블 유효성 확인
 	if (GetOwnerRole() != ROLE_Authority || !WeaponTable) return;
 
@@ -368,7 +387,12 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject)) return;
 
 	UWorld* World = GetWorld();
-	if (!World || !WeaponTable || !WeaponClass) return;
+	if (!World) return;
+
+	const URtsGameSettings* GameSettings = GetDefault<URtsGameSettings>();
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+
+	if (!WeaponTable || !WeaponClass) return;
 
 	ACharacter* TargetChar = OwnerChar ? OwnerChar : Cast<ACharacter>(GetOwner());
 	if (!TargetChar) return;
@@ -470,6 +494,8 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 
 void UEquipComponent::EquipToWeapon(FName WeaponName)
 {
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+
 	// 서버 권한 및 유효성 확인
 	if (GetOwnerRole() != ROLE_Authority || WeaponName.IsNone() || !WeaponTable) return;
 
@@ -496,18 +522,21 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 float UEquipComponent::GetAttackRange() const
 {
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	if (WeaponTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
+
+	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
+
 	// 1. 우선순위: 오른손 무기 데이터 확인
-	if (WeaponTable && !m_RightWeaponName.IsNone())
+	if (!m_RightWeaponName.IsNone())
 	{
 		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("GetRange"));
-		if (WeaponData)
-		{
-			return (float)WeaponData->AttackRange;
-		}
+		if (WeaponData) return (float)WeaponData->AttackRange;
 	}
 
 	// 2. 차순위: 왼손 무기 데이터 확인 (활이나 양손 무기 대응)
-	if (WeaponTable && !m_LeftWeaponName.IsNone())
+	if (!m_LeftWeaponName.IsNone())
 	{
 		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("GetRange"));
 		if (WeaponData)
@@ -521,9 +550,9 @@ float UEquipComponent::GetAttackRange() const
 	}
 
 	// 3. 무기가 없을 때: 유닛 기본 데이터 테이블에서 사거리 반환
-	if (UnitTable && !m_UnitRowName.IsNone())
+	if (!m_UnitRowName.IsNone())
 	{
-		const FST_Unit* UnitData = GetUnitData(m_UnitRowName);
+		const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
 		if (UnitData)
 		{
 			// FST_Unit 구조체에도 AttackRange 변수가 정의되어 있어야 합니다.
@@ -537,10 +566,14 @@ float UEquipComponent::GetAttackRange() const
 
 float UEquipComponent::GetDetectionRange() const
 {
+	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
+
 	// 유닛 데이터 테이블에서 해당 유닛의 인지 범위를 가져옵니다.
-	if (UnitTable && !m_UnitRowName.IsNone())
+	if (!m_UnitRowName.IsNone())
 	{
-		if (const FST_Unit* Data = GetUnitData(m_UnitRowName))
+		const FST_Unit* Data = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
+		if (Data)
 		{
 			return Data->DetectionRange;
 		}

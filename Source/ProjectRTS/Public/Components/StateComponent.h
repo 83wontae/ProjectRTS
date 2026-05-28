@@ -141,9 +141,6 @@ protected:
     UPROPERTY(Replicated, BlueprintReadWrite, Category = "RTS|State")
     TWeakObjectPtr<AActor> m_AggroTarget;
 
-    UPROPERTY(EditAnywhere, Category = "RTS|Data")
-    class UDataTable* JobDataTable;
-
 private:
     UPROPERTY() class ACharacter* OwnerChar;
     FTimerHandle DestroyTimerHandle;

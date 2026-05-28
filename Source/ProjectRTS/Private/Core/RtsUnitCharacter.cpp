@@ -4,6 +4,7 @@
 #include "Components/SkillComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/DecalComponent.h"
+#include "Global/RtsGameSettings.h"
 
 ARtsUnitCharacter::ARtsUnitCharacter()
 {
@@ -68,13 +69,16 @@ void ARtsUnitCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 
     FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
+	UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	if (!UnitTable) return;
+
     // UnitRowName이 바뀌었을 때 실시간 업데이트
     if (PropertyName == GET_MEMBER_NAME_CHECKED(ARtsUnitCharacter, UnitRowName))
     {
         if (EquipComp && !UnitRowName.IsNone())
         {
             // GetUnitData 함수가 EquipComp에 구현되어 있어야 합니다.
-            const FST_Unit* UnitData = EquipComp->GetUnitData(UnitRowName);
+			const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT(""));
             if (UnitData)
             {
                 HandleUnitBodyUpdate(*UnitData);
@@ -88,6 +92,9 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
 
+    UDataTable* UnitTable = RtsSettings::GetUnitTable();
+	if (!UnitTable) return;
+
     // 1. 메시 포즈 동기화
     if (GetMesh())
     {
@@ -98,7 +105,7 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
     // 2. 유닛 바디 업데이트
     if (EquipComp && !UnitRowName.IsNone())
     {
-        const FST_Unit* UnitData = EquipComp->GetUnitData(UnitRowName);
+        const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT(""));
         if (UnitData) HandleUnitBodyUpdate(*UnitData);
     }
 

@@ -44,7 +44,4 @@ private:
     /** 고용된 인재들의 명단 (통합 구조체 사용) */
     UPROPERTY(VisibleAnywhere, Category = "RTS|Recruitment")
     TArray<FST_UnitSaveData> RecruitedUnits;
-
-    UPROPERTY(EditAnywhere, Category = "RTS|Data")
-    class UDataTable* UnitDataTable;
 };

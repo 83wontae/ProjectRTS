@@ -11,6 +11,7 @@
 #include "Interface/ProjectileInterface.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/DebugWidgetComponent.h"
+#include "Global/RtsGameSettings.h"
 
 USkillComponent::USkillComponent()
 {
@@ -221,8 +222,11 @@ FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
+	UDataTable* WeaponTable = RtsSettings::GetWeaponTable();
+	if (!WeaponTable) return NAME_None;
+
 	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
-	if (!EquipComp || !EquipComp->WeaponTable) return NAME_None;
+	if (!EquipComp) return NAME_None;
 
 	// 1. 메인 무기 이름 결정 (오른손 우선, 없으면 왼손)
 	FName MainWeaponName = !EquipComp->m_RightWeaponName.IsNone() ?
@@ -236,7 +240,7 @@ FName USkillComponent::GetDefaultAttackSkillName()
 	}
 
 	// 3. 데이터 테이블에서 스킬 이름 찾기
-	const FST_Weapon* WeaponData = EquipComp->WeaponTable->FindRow<FST_Weapon>(MainWeaponName, TEXT(""));
+	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(MainWeaponName, TEXT(""));
 	if (!WeaponData) return NAME_None;
 
 	// 4. 탑승 여부에 따른 최종 스킬 반환

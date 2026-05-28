@@ -5,6 +5,7 @@
 #include "Components/StateComponent.h" // 추가
 #include "GameFramework/PlayerStart.h"
 #include "EngineUtils.h"
+#include "Global/RtsGameSettings.h"
 #include "Kismet/KismetMathLibrary.h"
 
 URecruitmentComponent::URecruitmentComponent()
@@ -33,12 +34,8 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
 
 void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadius)
 {
-    // 1. 데이터 테이블 유효성 확인
-    if (!UnitDataTable)
-    {
-        UE_LOG(LogTemp, Error, TEXT("URecruitmentComponent: UnitDataTable is NULL!"));
-        return;
-    }
+    UDataTable* UnitDataTable = RtsSettings::GetUnitTable();
+    if (!UnitDataTable) return;
 
     // 2. PlayerStart 찾기
     APlayerStart* TargetStart = nullptr;
@@ -53,9 +50,7 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
     // 3. 리스트의 모든 유닛 순회하며 스폰
     for (const FST_UnitSaveData& RecruitData : RecruitedUnits)
     {
-        // 데이터 테이블에서 유닛 정보(UnitClass 포함)를 가져옵니다.
-        const FST_Unit* UnitInfo = UnitDataTable->FindRow<FST_Unit>(RecruitData.UnitRowName, TEXT(""));
-
+		FST_Unit* UnitInfo = UnitDataTable->FindRow<FST_Unit>(RecruitData.UnitRowName, TEXT("SpawnRecruitedUnits"));
         // 유효성 및 클래스 설정 확인
         if (!UnitInfo || !UnitInfo->UnitClass) continue;
 
