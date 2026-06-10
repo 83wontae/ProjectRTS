@@ -129,3 +129,52 @@ struct FST_UnitData
     UPROPERTY(EditAnywhere) FST_Attributes Attributes; // 누적된 총 속성치
     UPROPERTY(VisibleAnywhere) FST_CombatStats FinalStats; // 계산된 최종 전투력
 };
+
+/**
+ * 게임 내에 스폰되어 활동 중인 유닛의 종합 런타임 데이터입니다.
+ * UI 갱신, 데미지 계산, 세이브 데이터 변환 시 핵심 포인터로 사용됩니다.
+ */
+USTRUCT(BlueprintType)
+struct FST_ActiveUnitInfo
+{
+    GENERATED_BODY()
+
+    // 1. 고유 식별 및 참조 (메시나 텍스처를 직접 들고 있지 않고 행 이름만 기억합니다)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Identity")
+    FName UnitRowName;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Identity")
+    FName CurrentJobRowName;
+
+    // 2. 실시간 전투 상태 (MaxHp는 FinalStats에 있지만, '현재 체력'은 이곳에서 관리합니다)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Status")
+    double CurrentHp = 0.0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Status")
+    double CurrentMana = 0.0;
+
+    // 3. 실시간 스탯 및 성장 (기존에 만드신 구조체 활용)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Growth")
+    FST_UnitData GrowthData;
+
+    // 4. 현재 장착 중인 장비 목록 (RTSItemTypes의 장비 RowName 참조)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
+    FName EquipHandR;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
+    FName EquipHandL;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
+    FName EquipHead;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Equipment")
+    FName EquipBody;
+
+    // 5. 현재 유닛에게 적용된 버프/디버프 스킬 이름 목록 (옵션)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Buffs")
+    TArray<FName> ActiveBuffs;
+
+    // 6. 현재 유닛이 사용 가능한 액티브/패시브 스킬 목록 (능동적인 보유 스킬)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Skills")
+    TArray<FName> AvailableSkills;
+};

@@ -34,6 +34,9 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
 	TSoftObjectPtr<UDataTable> JobDataTable;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
+	TSoftObjectPtr<UDataTable> SkillDataTable;
 };
 
 namespace RtsSettings
@@ -76,6 +79,15 @@ namespace RtsSettings
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
 			return Instance->GetArmorDataTable();
+		}
+		return nullptr;
+	}
+
+	FORCEINLINE UDataTable* GetSkillTable(const UObject* WorldContextObject)
+	{
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->GetSkillDataTable();
 		}
 		return nullptr;
 	}

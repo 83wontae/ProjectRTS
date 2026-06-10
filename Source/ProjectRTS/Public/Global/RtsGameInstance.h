@@ -19,6 +19,7 @@ public:
 	UDataTable* GetWeaponDataTable();
 	UDataTable* GetArmorDataTable();
 	UDataTable* GetJobDataTable();
+	UDataTable* GetSkillDataTable();
 
 private:
 	// === 캐싱용 포인터만 남깁니다. Config나 EditAnywhere는 불필요합니다. ===
@@ -33,4 +34,7 @@ private:
 
 	UPROPERTY()
 	UDataTable* CachedJobTable = nullptr;
+
+	UPROPERTY()
+	UDataTable* CachedSkillTable = nullptr;
 };

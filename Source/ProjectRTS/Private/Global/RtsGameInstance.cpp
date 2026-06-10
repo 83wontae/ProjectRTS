@@ -52,3 +52,21 @@ UDataTable* URtsGameInstance::GetJobDataTable()
 	}
 	return CachedJobTable;
 }
+
+UDataTable* URtsGameInstance::GetSkillDataTable()
+{
+	// 1. 이미 캐싱되어 있다면 바로 반환
+	if (CachedSkillTable != nullptr)
+	{
+		return CachedSkillTable;
+	}
+
+	// 2. 캐싱되어 있지 않다면 Settings에서 경로를 읽어와 로드
+	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
+	if (Settings && Settings->SkillDataTable.ToSoftObjectPath().IsValid())
+	{
+		CachedSkillTable = Settings->SkillDataTable.LoadSynchronous();
+	}
+
+	return CachedSkillTable;
+}
