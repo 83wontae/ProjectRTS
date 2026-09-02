@@ -26,6 +26,9 @@ struct FST_UnitSaveData
 
     // 2. 실시간 성장 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FString Name = "UnitName";
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
     int32 Level = 1;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)

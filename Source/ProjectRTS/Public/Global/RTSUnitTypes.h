@@ -126,6 +126,7 @@ struct FST_UnitData
 
     UPROPERTY(VisibleAnywhere) int32 Level = 1;
     UPROPERTY(VisibleAnywhere) double CurrentExp = 0.0;
+    UPROPERTY(VisibleAnywhere) FString Name = "UnitName";
     UPROPERTY(EditAnywhere) FST_Attributes Attributes; // 누적된 총 속성치
     UPROPERTY(VisibleAnywhere) FST_CombatStats FinalStats; // 계산된 최종 전투력
 };
