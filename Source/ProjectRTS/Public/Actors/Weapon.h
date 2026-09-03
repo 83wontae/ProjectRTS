@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interface/WeaponInterface.h"	// 인터페이스 포함
-#include "Global/ProjectRTSTypes.h"		// 무기 구조체 포함
+#include "Global/ProjectRTSTypes.h"	// 무기 구조체 포함
 #include "Weapon.generated.h"
 
 UCLASS()
@@ -21,6 +21,9 @@ protected:
 
 	/** 에디터 상에서의 시각적 동기화를 위한 Construction Script */
 	virtual void OnConstruction(const FTransform& Transform) override;
+
+	/** 무기 데이터 테이블을 참조하여 StaticMeshComponent를 갱신하는 헬퍼 함수 */
+	void UpdateWeaponMesh();
 
 	/** 무기 메시 컴포넌트 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")

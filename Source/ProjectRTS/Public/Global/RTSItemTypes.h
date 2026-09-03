@@ -7,6 +7,52 @@
 #include "Global/RTSCoreTypes.h" // 기초 타입 활용을 위해 포함
 #include "RTSItemTypes.generated.h"
 
+// 1. 공통 아이템 분류
+UENUM(BlueprintType)
+enum class EItemType : uint8
+{
+    None        UMETA(DisplayName = "None"),     // 기본값 및 유효하지 않은 타입
+    Consumable  UMETA(DisplayName = "소모품"),
+    Weapon      UMETA(DisplayName = "무기"),
+    Armor       UMETA(DisplayName = "방어구"),
+    Etc         UMETA(DisplayName = "기타")
+};
+
+// 2. 기본 베이스 아이템 구조체
+USTRUCT(BlueprintType)
+struct FST_ItemBase : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    FText DisplayName;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    EItemType ItemType = EItemType::None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    TSoftObjectPtr<UTexture2D> IconSprite;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    TSoftObjectPtr<UStaticMesh> WorldMesh;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    int32 MaxStackCount = 1;
+};
+
+// 아이템 슬롯 구조체
+USTRUCT(BlueprintType)
+struct FST_ItemSlot : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    int32 Count = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    FST_ItemBase ItemData;
+};
+
 /** * 무기 유형
  * 어떤 종류의 무기인지 구분하며, 애니메이션 결정 시 참조될 수 있습니다.
  */
@@ -35,7 +81,7 @@ enum class EWeaponHandConstraint : uint8
  * 스태틱 메시와 공격력, 사거리 등 실질적인 전투 수치를 포함합니다.
  */
 USTRUCT(BlueprintType)
-struct FST_Weapon : public FTableRowBase
+struct FST_Weapon : public FST_ItemBase
 {
     GENERATED_BODY()
 
@@ -60,7 +106,7 @@ struct FST_Weapon : public FTableRowBase
     FName MuzzleSocketName = TEXT("MuzzleSocket");
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-    class UStaticMesh* StaticMesh;
+    TSoftObjectPtr<UStaticMesh> StaticMesh;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     double AttackPower;
@@ -73,7 +119,7 @@ struct FST_Weapon : public FTableRowBase
  * 스켈레탈 메시 부품(머리, 몸통 등)과 아이콘 정보를 관리합니다.
  */
 USTRUCT(BlueprintType)
-struct FST_Armor : public FTableRowBase
+struct FST_Armor : public FST_ItemBase
 {
     GENERATED_BODY()
 
@@ -87,8 +133,8 @@ struct FST_Armor : public FTableRowBase
     EUnitType UnitType;   // RTSCoreTypes.h에 정의됨
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Armor")
-    class USkeletalMesh* SkeletalMesh;
+    TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Armor")
-    class UTexture2D* Icon;
+    TSoftObjectPtr<UTexture2D> Icon;
 };

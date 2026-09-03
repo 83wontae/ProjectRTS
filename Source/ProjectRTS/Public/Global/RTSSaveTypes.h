@@ -10,7 +10,7 @@
  * 유닛의 고유 식별자와 무한 성장으로 쌓아온 결과물을 기록합니다.
  */
 USTRUCT(BlueprintType)
-struct FST_UnitSaveData
+struct FST_UnitSaveData : public FTableRowBase
 {
     GENERATED_BODY()
 
@@ -46,7 +46,7 @@ struct FST_UnitSaveData
  * 보유한 인재 리스트와 자원, 진행도 등을 담습니다.
  */
 USTRUCT(BlueprintType)
-struct FST_SaveGameData
+struct FST_SaveGameData : public FTableRowBase
 {
     GENERATED_BODY()
 

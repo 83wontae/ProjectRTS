@@ -26,14 +26,36 @@ void AWeapon::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	// 런타임/스폰 시 테이블과 RowName이 들어오면 메시 즉시 로드 및 갱신
+	UpdateWeaponMesh();
+}
+
+void AWeapon::UpdateWeaponMesh()
+{
+	if (!WeaponMesh)
+	{
+		return;
+	}
+
 	if (WeaponTable && !WeaponRowName.IsNone())
 	{
-		FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT("InitWeapon"));
-		if (Data && WeaponMesh)
+		const FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT("UpdateWeaponMesh"));
+		if (Data)
 		{
-			WeaponMesh->SetStaticMesh(Data->StaticMesh);
+			// TSoftObjectPtr 처리:
+			// 에셋 경로가 지정되어 있는지 확인 후, 이미 로드되어 있으면 기존 포인터를 반환하고
+			// 로드되어 있지 않다면 즉시 로드하여 적용합니다.
+			if (!Data->StaticMesh.IsNull())
+			{
+				UStaticMesh* LoadedMesh = Data->StaticMesh.LoadSynchronous();
+				WeaponMesh->SetStaticMesh(LoadedMesh);
+				return;
+			}
 		}
 	}
+
+	// 테이블이나 RowName이 유효하지 않거나 메시 경로가 비어있는 경우 초기화
+	WeaponMesh->SetStaticMesh(nullptr);
 }
 
 void AWeapon::InitializeWeapon(UDataTable* InTable, FName InRowName)
@@ -43,12 +65,8 @@ void AWeapon::InitializeWeapon(UDataTable* InTable, FName InRowName)
 		WeaponTable = InTable;
 		WeaponRowName = InRowName;
 
-		// 메시 즉시 업데이트 (에디터 뷰포트 반영용)
-		FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT("Init"));
-		if (Data && WeaponMesh)
-		{
-			WeaponMesh->SetStaticMesh(Data->StaticMesh);
-		}
+		// 런타임/스폰 시 테이블과 RowName이 들어오면 메시 즉시 로드 및 갱신
+		UpdateWeaponMesh();
 	}
 }
 
