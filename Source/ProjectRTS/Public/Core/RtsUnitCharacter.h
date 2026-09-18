@@ -2,12 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Interface/EquipableInterface.h"
 #include "Interface/UnitInterface.h"
-#include "Global/ProjectRTSTypes.h"
+#include "Global/ProjectRTSTypes.h"// 통합 구조체 포함
 #include "RtsUnitCharacter.generated.h"
 
 UCLASS()
-class PROJECTRTS_API ARtsUnitCharacter : public ACharacter, public IUnitInterface
+class PROJECTRTS_API ARtsUnitCharacter : public ACharacter, public IUnitInterface, public IEquipableInterface
 {
     GENERATED_BODY()
 
@@ -40,6 +41,10 @@ public:
     virtual float GetAttackRange_Implementation() const override;
 
     virtual float GetDetectionRange_Implementation() const override;
+
+
+    // --- IEquipableInterface 구현 ---
+    virtual USkeletalMeshComponent* GetTargetAttachMesh_Implementation() const override;
 
     /** 유닛의 데이터를 강제 업데이트 (생성 및 데이터 변경 시 호출) */
     UFUNCTION(BlueprintCallable, Category = "RTS|Unit")

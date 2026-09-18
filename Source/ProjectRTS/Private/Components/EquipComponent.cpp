@@ -8,6 +8,7 @@
 #include "Components/SkillComponent.h"
 #include "Interface/WeaponInterface.h"
 #include "Global/RtsGameSettings.h"
+#include "Interface/EquipableInterface.h"	
 
 // Sets default values for this component's properties
 UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
@@ -392,10 +393,24 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	const URtsGameSettings* GameSettings = GetDefault<URtsGameSettings>();
 	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 
-	if (!WeaponTable || !WeaponClass) return;
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !WeaponTable || !WeaponClass) return;
 
-	ACharacter* TargetChar = OwnerChar ? OwnerChar : Cast<ACharacter>(GetOwner());
-	if (!TargetChar) return;
+	USkeletalMeshComponent* AttachMesh = nullptr;
+
+	// 인터페이스를 통한 메시 획득
+	if (OwnerActor->Implements<UEquipableInterface>())
+	{
+		AttachMesh = IEquipableInterface::Execute_GetTargetAttachMesh(OwnerActor);
+	}
+	else
+	{
+		// 인터페이스를 안 붙인 액터가 있을 때 에러 로그 출력
+		UE_LOG(LogTemp, Error, TEXT("[%s] IEquipableInterface를 구현하지 않아 무기를 부착할 수 없습니다!"), *OwnerActor->GetName());
+		return;
+	}
+
+	if (!AttachMesh) return;
 
 	// --- [기존 무기 해제 로직] ---
 	// 1. 요청된 슬롯에 따라 현재 관리 중인 변수를 선택합니다.
@@ -450,7 +465,7 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 
 	// --- [부착 로직 및 로그] ---
 	FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-	NewWeapon->AttachToComponent(TargetChar->GetMesh(), AttachRules, FinalSocket);
+	NewWeapon->AttachToComponent(AttachMesh, AttachRules, FinalSocket);
 
 	if (GEngine)
 	{

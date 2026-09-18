@@ -10,9 +10,13 @@
  * 유닛의 고유 식별자와 무한 성장으로 쌓아온 결과물을 기록합니다.
  */
 USTRUCT(BlueprintType)
-struct FST_UnitSaveData : public FTableRowBase
+struct FST_UnitSaveRecord : public FTableRowBase
 {
     GENERATED_BODY()
+
+    /** 생성된 유니크한 유닛을 식별하기 위한 ID (세이브/로드, 네트워크 매핑에 사용) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FGuid UniqueId;
 
     // 1. 기초 고용 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -50,9 +54,9 @@ struct FST_SaveGameData : public FTableRowBase
 {
     GENERATED_BODY()
 
-    /** 플레이어가 보유한 유닛(인재) 목록 */
+    /** 플레이어가 보유한 유닛(인재) 목록 (세이브용) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TArray<FST_UnitSaveData> RecruitedUnits;
+    TArray<FST_UnitSaveRecord> SavedUnitRoster;
 
     /** 보유 자원 (금광, 식량 등) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)

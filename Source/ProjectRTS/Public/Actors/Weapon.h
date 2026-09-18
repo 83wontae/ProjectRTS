@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interface/WeaponInterface.h"	// 인터페이스 포함
-#include "Global/ProjectRTSTypes.h"	// 무기 구조체 포함
+#include "Global/ProjectRTSTypes.h"	// 통합 구조체 포함
 #include "Weapon.generated.h"
 
 UCLASS()

@@ -153,9 +153,9 @@ public:
 
     /** 유닛의 고용 정보와 성장 상태를 모두 포함한 통합 데이터를 반환합니다. */
     UFUNCTION(BlueprintCallable, Category = "RTS|Save")
-    FST_UnitSaveData GetFullSaveData();
+    FST_UnitSaveRecord GetFullSaveData();
 
     /** 통합 데이터를 받아 유닛의 상태와 장비를 한 번에 복구합니다. */
     UFUNCTION(BlueprintCallable, Category = "RTS|Save")
-    void LoadFromFullSaveData(const FST_UnitSaveData& InData);
+    void LoadFromFullSaveData(const FST_UnitSaveRecord& InData);
 };

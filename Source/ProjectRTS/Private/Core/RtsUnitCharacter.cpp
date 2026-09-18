@@ -116,6 +116,11 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
     }
 }
 
+USkeletalMeshComponent* ARtsUnitCharacter::GetTargetAttachMesh_Implementation() const
+{
+    return GetMesh();
+}
+
 void ARtsUnitCharacter::InitializeUnit()
 {
     // 캐릭터는 '어떤 유닛인지' 식별자만 컴포넌트에 넘깁니다.

@@ -21,21 +21,22 @@ void URtsSaveSubsystem::SaveGame(const FString& SlotName, int32 UserIndex)
         if (RecruitComp)
         {
             // 2. 컴포넌트의 리스트를 세이브 데이터로 복사
-            for (const FST_UnitSaveData& Unit : RecruitComp->GetRecruitedUnits())
+            for (const FST_UnitSaveRecord& Unit : RecruitComp->GetSavedUnitRoster())
             {
-                FST_UnitSaveData SaveUnit;
+                FST_UnitSaveRecord SaveUnit;
                 SaveUnit.UnitRowName = Unit.UnitRowName;
                 SaveUnit.HandR = Unit.HandR;
                 SaveUnit.HandL = Unit.HandL;
+                SaveUnit.UniqueId = Unit.UniqueId;
 
-                SaveGameObject->SaveData.RecruitedUnits.Add(SaveUnit);
+                SaveGameObject->SaveData.SavedUnitRoster.Add(SaveUnit);
             }
         }
     }
 
     // 3. 파일 저장
     UGameplayStatics::SaveGameToSlot(SaveGameObject, SlotName, UserIndex);
-    UE_LOG(LogTemp, Log, TEXT("Roster Saved! Total Units: %d"), SaveGameObject->SaveData.RecruitedUnits.Num());
+    UE_LOG(LogTemp, Log, TEXT("Roster Saved! Total Units: %d"), SaveGameObject->SaveData.SavedUnitRoster.Num());
 }
 
 void URtsSaveSubsystem::LoadGame(const FString& SlotName, int32 UserIndex)
@@ -53,9 +54,9 @@ void URtsSaveSubsystem::LoadGame(const FString& SlotName, int32 UserIndex)
             RecruitComp->ClearRoster();
 
             // 세이브 파일의 데이터를 컴포넌트로 복구
-            for (const FST_UnitSaveData& SaveUnit : SaveGameObject->SaveData.RecruitedUnits)
+            for (const FST_UnitSaveRecord& SaveUnit : SaveGameObject->SaveData.SavedUnitRoster)
             {
-                RecruitComp->AddUnitToRoster(SaveUnit.UnitRowName, SaveUnit.HandR, SaveUnit.HandL);
+                RecruitComp->AddUnitToRosterFromSave(SaveUnit);
             }
         }
     }
@@ -63,7 +64,7 @@ void URtsSaveSubsystem::LoadGame(const FString& SlotName, int32 UserIndex)
     UE_LOG(LogTemp, Log, TEXT("Roster Loaded Successfully."));
 }
 
-void URtsSaveSubsystem::SpawnUnitFromSaveData(const FST_UnitSaveData& UnitData)
+void URtsSaveSubsystem::SpawnUnitFromSaveData(const FST_UnitSaveRecord& UnitData)
 {
     // 데이터 테이블에서 UnitRowName에 해당하는 클래스 정보를 가져와 스폰 로직을 진행합니다.
     // 1레벨로 생성한 뒤 StateComp->LoadFromSaveData(UnitData)를 호출하여 

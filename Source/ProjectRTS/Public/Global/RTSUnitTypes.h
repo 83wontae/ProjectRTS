@@ -136,7 +136,7 @@ struct FST_UnitData
  * UI 갱신, 데미지 계산, 세이브 데이터 변환 시 핵심 포인터로 사용됩니다.
  */
 USTRUCT(BlueprintType)
-struct FST_ActiveUnitInfo
+struct FST_RuntimeUnitInfo
 {
     GENERATED_BODY()
 

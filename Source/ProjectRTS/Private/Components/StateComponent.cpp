@@ -218,9 +218,9 @@ void UStateComponent::DestroyDelay()
 
 /** --- [저장 및 로드 시스템] --- */
 
-FST_UnitSaveData UStateComponent::GetFullSaveData()
+FST_UnitSaveRecord UStateComponent::GetFullSaveData()
 {
-    FST_UnitSaveData SaveData;
+    FST_UnitSaveRecord SaveData;
 
     // 1. 기초 정보 및 성장 데이터 추출
     if (ARtsUnitCharacter* Owner = Cast<ARtsUnitCharacter>(GetOwner()))
@@ -243,7 +243,7 @@ FST_UnitSaveData UStateComponent::GetFullSaveData()
     return SaveData;
 }
 
-void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveData& InData)
+void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
 {
     // 1. 성장 데이터 복구
     m_CurrentLevel = InData.Level;

@@ -26,7 +26,7 @@ public:
 
 protected:
     /** 특정 유닛 하나를 세이브 데이터로부터 스폰하는 헬퍼 함수 */
-    void SpawnUnitFromSaveData(const FST_UnitSaveData& UnitData);
+    void SpawnUnitFromSaveData(const FST_UnitSaveRecord& UnitData);
 
     /** 유닛 정보를 담고 있는 데이터 테이블 (유닛 클래스 참조용) */
     UPROPERTY()
