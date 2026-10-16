@@ -50,6 +50,19 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RTS|Recruitment")
     bool TryGetActiveUnit(const FGuid& Id, FST_RuntimeUnitInfo& OutInfo) const;
 
+    /** Register spawned actor for a UniqueId so other systems can find actor by id. */
+    void RegisterActorForUniqueId(const FGuid& Id, AActor* Actor);
+
+    /** Try to find actor instance by UniqueId. */
+    bool TryGetActorByUniqueId(const FGuid& Id, AActor*& OutActor) const;
+
+    /** Unregister actor mapping for a UniqueId. */
+    void UnregisterActorForUniqueId(const FGuid& Id);
+
+    /** Internal handler when a tracked actor is destroyed. */
+    UFUNCTION()
+    void HandleActorDestroyed(AActor* DestroyedActor);
+
 private:
     /** 고용된 인재들의 명단 (세이브용 권한 데이터) */
     UPROPERTY(VisibleAnywhere, Category = "RTS|Recruitment")
@@ -58,5 +71,13 @@ private:
     /** 런타임에서 관리할 RuntimeUnit 정보 맵 (UniqueId -> RuntimeInfo) */
     UPROPERTY(VisibleAnywhere, Category = "RTS|Recruitment")
     TMap<FGuid, FST_RuntimeUnitInfo> RuntimeUnitsById;
+
+    /** Mapping from UniqueId to spawned actor (weak ptr to avoid circular refs) */
+    UPROPERTY()
+    TMap<FGuid, TWeakObjectPtr<AActor>> UniqueIdToActor;
+
+    /** Reverse map to find UniqueId by actor pointer */
+    UPROPERTY()
+    TMap<TWeakObjectPtr<AActor>, FGuid> ActorToUniqueId;
 
 };

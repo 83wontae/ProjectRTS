@@ -5,6 +5,17 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "Misc/Guid.h"
+#include "Global/ProjectRTSTypes.h"
+#include "Misc/Guid.h"
+
+UENUM(BlueprintType)
+enum class EFormationType : uint8
+{
+	Grid    UMETA(DisplayName = "Grid"),
+	Circle  UMETA(DisplayName = "Circle"),
+	Line    UMETA(DisplayName = "Line")
+};
 #include "RtsPlayerController.generated.h"
 
 /**
@@ -17,6 +28,20 @@ class PROJECTRTS_API ARtsPlayerController : public APlayerController
 	
 public:
 	ARtsPlayerController();
+
+	virtual void Tick(float DeltaSeconds) override;
+
+	/** Dynamic reformation */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	bool bEnableDynamicReformation = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	float ReformationInterval = 1.0f; // seconds
+
+protected:
+	bool bHasActiveMove = false;
+	FVector CurrentMoveGoal = FVector::ZeroVector;
+	float TimeSinceLastReform = 0.0f;
 
 	/** 입력 모드 전환 함수 */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Input")
@@ -88,4 +113,41 @@ public:
 	/** 선택된 유닛들을 목표 지점으로 이동시킴 */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Movement")
 	void MoveUnits(FVector Goal);
+
+	/** Set leader by UniqueId (will select leader actor if found) */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Formation")
+	void SetLeaderByUniqueId(const FGuid& UniqueId);
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Formation")
+	void ClearLeader();
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Formation")
+	void SetLeaderToSelectedFirst();
+
+	/** Formation settings */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	EFormationType FormationType = EFormationType::Grid;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	float FormationSpacing = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	float FormationJitterRatio = 0.1f; // fraction of spacing
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	bool bUseLeaderFollower = false;
+
+	/** If using leader-follower, leader UniqueId (optional). If invalid, first selected actor is leader. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	FGuid LeaderUniqueId;
+
+	/** Per-actor current targets for dynamic reformation */
+	UPROPERTY(Transient)
+	TMap<TWeakObjectPtr<AActor>, FVector> CurrentUnitTargets;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	float AcceptanceRadius = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Formation")
+	float StuckVelocityThreshold = 10.0f; // below this considered stuck
 };

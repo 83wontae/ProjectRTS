@@ -24,6 +24,11 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
 
     SavedUnitRoster.Add(NewUnit);
 
+    if (!UniqueIdToActor.Contains(NewUnit.UniqueId))
+    {
+        UniqueIdToActor.Add(NewUnit.UniqueId, nullptr);
+    }
+
     // ActiveUnits 맵에도 동기화
     FST_RuntimeUnitInfo ActiveInfo;
     ActiveInfo.UnitRowName = NewUnit.UnitRowName;
@@ -38,6 +43,12 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
     ActiveInfo.CurrentHp = 0.0;
 
     RuntimeUnitsById.Add(NewUnit.UniqueId, ActiveInfo);
+
+    // ensure UniqueIdToActor has an entry (empty) for consistency
+    if (!UniqueIdToActor.Contains(NewUnit.UniqueId))
+    {
+        UniqueIdToActor.Add(NewUnit.UniqueId, nullptr);
+    }
 
     if (OnUnitRecruited.IsBound())
     {
@@ -74,6 +85,57 @@ bool URecruitmentComponent::TryGetActiveUnit(const FGuid& Id, FST_RuntimeUnitInf
         return true;
     }
     return false;
+}
+
+void URecruitmentComponent::RegisterActorForUniqueId(const FGuid& Id, AActor* Actor)
+{
+    if (!Id.IsValid() || !Actor) return;
+
+    UniqueIdToActor.Add(Id, Actor);
+    ActorToUniqueId.Add(Actor, Id);
+
+    // bind to actor destroyed to cleanup mappings
+    Actor->OnDestroyed.AddDynamic(this, &URecruitmentComponent::HandleActorDestroyed);
+}
+
+bool URecruitmentComponent::TryGetActorByUniqueId(const FGuid& Id, AActor*& OutActor) const
+{
+    const TWeakObjectPtr<AActor>* Found = UniqueIdToActor.Find(Id);
+    if (Found && Found->IsValid())
+    {
+        OutActor = Found->Get();
+        return true;
+    }
+    OutActor = nullptr;
+    return false;
+}
+
+void URecruitmentComponent::UnregisterActorForUniqueId(const FGuid& Id)
+{
+    if (!Id.IsValid()) return;
+
+    const TWeakObjectPtr<AActor>* Found = UniqueIdToActor.Find(Id);
+    if (Found && Found->IsValid())
+    {
+        AActor* Actor = Found->Get();
+        // remove reverse map entry
+        ActorToUniqueId.Remove(Actor);
+        // remove binding - safe even if already unbound
+        Actor->OnDestroyed.RemoveAll(this);
+    }
+    UniqueIdToActor.Remove(Id);
+}
+
+void URecruitmentComponent::HandleActorDestroyed(AActor* DestroyedActor)
+{
+    if (!DestroyedActor) return;
+
+    const FGuid* FoundId = ActorToUniqueId.Find(DestroyedActor);
+    if (FoundId)
+    {
+        UniqueIdToActor.Remove(*FoundId);
+        ActorToUniqueId.Remove(DestroyedActor);
+    }
 }
 
 void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadius)
@@ -122,6 +184,9 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
             {
                 SpawnedUnit->StateComp->LoadFromFullSaveData(RecruitData);
             }
+            // ensure actor's UniqueId is set and register mapping
+            SpawnedUnit->UniqueId = RecruitData.UniqueId;
+            RegisterActorForUniqueId(RecruitData.UniqueId, SpawnedUnit);
         }
     }
 }

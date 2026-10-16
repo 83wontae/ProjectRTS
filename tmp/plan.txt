@@ -1,0 +1,11 @@
+Plan: Implement all selected enhancements
+
+Changes to make:
+1) Expose formation parameters (Spacing, Jitter, FormationType enum, UseLeaderFollower, LeaderId) as UPROPERTY in ARtsPlayerController (Editable/BlueprintReadWrite).
+2) Add FormationType enum (Grid, Circle, Line).
+3) Modify MoveUnits to support Grid (existing), Circle, Line, and Leader-Follower mode.
+4) Implement dynamic reformation: when issuing moves, optionally reproject to navmesh and if unreachable choose nearest reachable within radius; adding a timer or reissue on Tick could be complex — implement immediate nav projection and small fallback search.
+5) Add helper functions: ComputeGridTarget, ComputeCircleTarget, ComputeLineTarget, ComputeLeaderTarget.
+6) Build and verify.
+
+Will now apply patches.

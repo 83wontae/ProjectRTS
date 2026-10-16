@@ -65,6 +65,10 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class USkillComponent* SkillComp;
 
+    /** Unique identifier for this spawned unit (used for save/load and mappings) */
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "RTS|Identity")
+    FGuid UniqueId;
+
     // --- 파츠 메시 컴포넌트 ---
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Appearance")
     class USkeletalMeshComponent* HeadMesh;

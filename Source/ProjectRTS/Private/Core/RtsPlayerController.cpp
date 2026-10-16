@@ -10,16 +10,93 @@
 #include "NavigationSystem.h" // 네비게이션 시스템 관련 기능을 위해 필요
 #include "Interface/UnitInterface.h" // 유닛 인터페이스 호출을 위해 필요
 #include "GameFramework/Character.h" // Character 캐스팅을 위해 필요
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Core/RtsPlayer.h" // Pawn 참조
 #include "Global/ProjectRTSTypes.h" // ERtsInputMode 열거형 참조
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Components/PlacementComponent.h"
+#include "Components/RecruitmentComponent.h"
+#include "Core/RtsUnitCharacter.h"
+class ARtsUnitCharacter;
 
 
 ARtsPlayerController::ARtsPlayerController():CurrentInputMode(ERtsInputMode::Tactical)
 {
 	PrimaryActorTick.bCanEverTick = true;
+}
+
+void ARtsPlayerController::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    if (!bEnableDynamicReformation || !bHasActiveMove) return;
+
+    TimeSinceLastReform += DeltaSeconds;
+    if (TimeSinceLastReform < ReformationInterval) return;
+
+    // reissue moves only for units that appear stuck or far from their assigned targets
+    TimeSinceLastReform = 0.0f;
+
+    UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+
+    TArray<TWeakObjectPtr<AActor>> Keys;
+    CurrentUnitTargets.GetKeys(Keys);
+
+    for (TWeakObjectPtr<AActor> WeakActor : Keys)
+    {
+        AActor* Actor = WeakActor.Get();
+        if (!Actor) { CurrentUnitTargets.Remove(WeakActor); continue; }
+
+        FVector Target = CurrentUnitTargets[WeakActor];
+
+        float DistSq = FVector::DistSquared2D(Actor->GetActorLocation(), Target);
+        if (DistSq <= AcceptanceRadius * AcceptanceRadius)
+        {
+            // close enough
+            continue;
+        }
+
+        // check movement speed (recomputed) and path following status
+        float Speed = 0.0f;
+        bool bIsMovingAccordingToAI = false;
+        if (APawn* P = Cast<APawn>(Actor))
+        {
+            if (UCharacterMovementComponent* MoveComp = P->FindComponentByClass<UCharacterMovementComponent>())
+            {
+                Speed = MoveComp->Velocity.Size();
+            }
+
+            if (AAIController* AICon = Cast<AAIController>(P->GetController()))
+            {
+                // Use high-level query to determine whether AI is currently following a path.
+                // Avoid depending on engine-internal enum values which can vary between versions.
+                bIsMovingAccordingToAI = AICon->IsFollowingAPath();
+            }
+        }
+
+        // consider stuck if speed is low AND AI isn't actively moving
+        if (Speed < StuckVelocityThreshold && !bIsMovingAccordingToAI)
+        {
+            // reissue move to this actor's target
+            if (APawn* P = Cast<APawn>(Actor))
+            {
+                if (AController* C = P->GetController())
+                {
+                    FVector Desired = Target;
+                    if (NavSys)
+                    {
+                        FNavLocation Projected;
+                        if (NavSys->ProjectPointToNavigation(Target, Projected, FVector(FormationSpacing * 0.5f)))
+                        {
+                            Desired = Projected.Location;
+                        }
+                    }
+                    UAIBlueprintHelperLibrary::SimpleMoveToLocation(C, Desired);
+                }
+            }
+        }
+    }
 }
 
 void ARtsPlayerController::BeginPlay()
@@ -203,21 +280,190 @@ void ARtsPlayerController::DoSelectUnitSingle()
 
 void ARtsPlayerController::MoveUnits(FVector Goal)
 {
-    // 1. 현재 선택된 액터들을 순회합니다. (For Each Loop)
-    for (AActor* Actor : SelectedActors)
+    int32 Count = SelectedActors.Num();
+    if (Count == 0) return;
+
+    const float Spacing = FMath::Max(10.0f, FormationSpacing);
+    const float JitterAmount = Spacing * FMath::Clamp(FormationJitterRatio, 0.0f, 1.0f);
+
+    // orientation based on camera yaw
+    FRotator YawRot(0.0f, GetControlRotation().Yaw, 0.0f);
+    const FVector Right = FRotationMatrix(YawRot).GetScaledAxis(EAxis::Y);
+    const FVector Forward = FRotationMatrix(YawRot).GetScaledAxis(EAxis::X);
+
+    UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+
+    // determine leader if using leader-follower
+    AActor* LeaderActor = nullptr;
+    if (bUseLeaderFollower)
     {
-        // 2. 액터를 Character로 캐스팅합니다. (Cast To Character)
-        ACharacter* SelectedChar = Cast<ACharacter>(Actor);
-        if (SelectedChar)
+        // if LeaderUniqueId provided, try to resolve to actor via RecruitmentComponent
+        if (LeaderUniqueId.IsValid())
         {
-            // 3. 캐릭터의 컨트롤러를 가져옵니다. (Get Controller)
-            AController* CharController = SelectedChar->GetController();
-            if (CharController)
+            URecruitmentComponent* RecruitComp = FindComponentByClass<URecruitmentComponent>();
+            if (RecruitComp)
             {
-                // 4. AI 기능을 사용하여 목표 지점으로 이동시킵니다. (Simple Move to Location)
-                // 네비게이션 메시(NavMesh)가 깔려 있어야 작동합니다.
-                UAIBlueprintHelperLibrary::SimpleMoveToLocation(CharController, Goal);
+                AActor* Found = nullptr;
+                if (RecruitComp->TryGetActorByUniqueId(LeaderUniqueId, Found) && Found)
+                {
+                    LeaderActor = Found;
+                }
             }
         }
+
+        // fallback to first selected actor
+        if (!LeaderActor && SelectedActors.Num() > 0)
+        {
+            LeaderActor = SelectedActors[0];
+        }
     }
+
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        AActor* Actor = SelectedActors[Index];
+        if (!Actor) continue;
+
+        ACharacter* SelectedChar = Cast<ACharacter>(Actor);
+        if (!SelectedChar) continue;
+
+        FVector Desired = Goal;
+
+        if (bUseLeaderFollower && LeaderActor && Actor != LeaderActor)
+        {
+            // follower: maintain offset relative to leader's target (simple grid offset around leader)
+            int32 FollowerIndex = Index - 1; // leader occupies first slot
+            int32 NumFollowers = Count - 1;
+            int32 NumCols = FMath::CeilToInt(FMath::Sqrt((float)NumFollowers));
+            int32 Row = FollowerIndex / NumCols;
+            int32 Col = FollowerIndex % NumCols;
+
+            const float HalfCols = (NumCols - 1) * 0.5f;
+            const float HalfRows = (FMath::CeilToInt((float)NumFollowers / (float)NumCols) - 1) * 0.5f;
+
+            FVector Offset = Right * ((Col - HalfCols) * Spacing) + Forward * ((Row - HalfRows) * Spacing);
+            Offset += Right * FMath::FRandRange(-JitterAmount, JitterAmount);
+            Offset += Forward * FMath::FRandRange(-JitterAmount, JitterAmount);
+
+            Desired = Goal + Offset; // leader moves to Goal, followers to Goal+offset
+        }
+        else
+        {
+            switch (FormationType)
+            {
+            case EFormationType::Grid:
+            {
+                int32 NumCols = FMath::CeilToInt(FMath::Sqrt((float)Count));
+                int32 NumRows = FMath::CeilToInt((float)Count / (float)NumCols);
+                int32 Row = Index / NumCols;
+                int32 Col = Index % NumCols;
+
+                const float HalfCols = (NumCols - 1) * 0.5f;
+                const float HalfRows = (NumRows - 1) * 0.5f;
+
+                FVector Offset = Right * ((Col - HalfCols) * Spacing) + Forward * ((Row - HalfRows) * Spacing);
+                Offset += Right * FMath::FRandRange(-JitterAmount, JitterAmount);
+                Offset += Forward * FMath::FRandRange(-JitterAmount, JitterAmount);
+
+                Desired = Goal + Offset;
+                break;
+            }
+            case EFormationType::Circle:
+            {
+                float Angle = (2.0f * PI) * ((float)Index / (float)Count);
+                float Radius = Spacing * FMath::CeilToInt((float)Count / 6.0f); // roughly scale radius with count
+                FVector Offset = FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.0f) * Radius;
+                // rotate offset to camera yaw
+                Offset = (Right * Offset.Y) + (Forward * Offset.X);
+                Offset += Right * FMath::FRandRange(-JitterAmount, JitterAmount);
+                Offset += Forward * FMath::FRandRange(-JitterAmount, JitterAmount);
+
+                Desired = Goal + Offset;
+                break;
+            }
+            case EFormationType::Line:
+            default:
+            {
+                // line centered on Goal, extend along Right axis
+                float Half = (Count - 1) * 0.5f;
+                float Pos = ((float)Index - Half) * Spacing;
+                FVector Offset = Right * Pos;
+                Offset += Right * FMath::FRandRange(-JitterAmount, JitterAmount);
+                Offset += Forward * FMath::FRandRange(-JitterAmount * 0.2f, JitterAmount * 0.2f);
+                Desired = Goal + Offset;
+                break;
+            }
+            }
+        }
+
+        // project to navmesh to ensure reachable point; fallback search radius = Spacing
+        if (NavSys)
+        {
+            FNavLocation Projected;
+            if (NavSys->ProjectPointToNavigation(Desired, Projected, FVector(Spacing * 0.5f)))
+            {
+                Desired = Projected.Location;
+            }
+            else
+            {
+                // try a small radius search
+                if (NavSys->ProjectPointToNavigation(Goal, Projected, FVector(Spacing * 2.0f)))
+                {
+                    Desired = Projected.Location;
+                }
+            }
+        }
+        AController* CharController = SelectedChar->GetController();
+        if (CharController)
+        {
+            UAIBlueprintHelperLibrary::SimpleMoveToLocation(CharController, Desired);
+        }
+
+        // record per-actor target
+        CurrentUnitTargets.FindOrAdd(Actor) = Desired;
+    }
+
+    // store current move goal for potential dynamic reformation
+    bHasActiveMove = true;
+    CurrentMoveGoal = Goal;
+}
+
+// Added leader control implementations
+void ARtsPlayerController::SetLeaderByUniqueId(const FGuid& UniqueId)
+{
+    LeaderUniqueId = UniqueId;
+    if (!LeaderUniqueId.IsValid()) return;
+
+    URecruitmentComponent* RecruitComp = FindComponentByClass<URecruitmentComponent>();
+    if (!RecruitComp) return;
+
+    AActor* Found = nullptr;
+    if (RecruitComp->TryGetActorByUniqueId(LeaderUniqueId, Found) && Found)
+    {
+        TArray<AActor*> Arr;
+        Arr.Add(Found);
+        DoSelectUnits(Arr);
+    }
+}
+
+void ARtsPlayerController::ClearLeader()
+{
+    LeaderUniqueId.Invalidate();
+}
+
+void ARtsPlayerController::SetLeaderToSelectedFirst()
+{
+    if (SelectedActors.Num() == 0) return;
+    AActor* Leader = SelectedActors[0];
+    if (!Leader) return;
+
+    if (ARtsUnitCharacter* Unit = Cast<ARtsUnitCharacter>(Leader))
+    {
+        if (Unit->UniqueId.IsValid())
+        {
+            LeaderUniqueId = Unit->UniqueId;
+            return;
+        }
+    }
+
+    LeaderUniqueId.Invalidate();
 }

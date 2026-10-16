@@ -5,6 +5,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/DecalComponent.h"
 #include "Global/RtsGameSettings.h"
+// ensure we can find the player controller and recruitment component when auto-registering
+#include "Kismet/GameplayStatics.h"
+#include "Components/RecruitmentComponent.h"
 
 ARtsUnitCharacter::ARtsUnitCharacter()
 {
@@ -48,6 +51,25 @@ void ARtsUnitCharacter::BeginPlay()
     }
 
     InitializeUnit();
+
+    // Ensure this actor is registered with the RecruitmentComponent so UniqueId->Actor mapping is consistent
+    // If UniqueId is not set, generate one so runtime lookups work across systems
+    if (!UniqueId.IsValid())
+    {
+        UniqueId = FGuid::NewGuid();
+    }
+
+    if (UWorld* W = GetWorld())
+    {
+        APlayerController* PC = UGameplayStatics::GetPlayerController(W, 0);
+        if (PC)
+        {
+            if (URecruitmentComponent* RecruitComp = PC->FindComponentByClass<URecruitmentComponent>())
+            {
+                RecruitComp->RegisterActorForUniqueId(UniqueId, this);
+            }
+        }
+    }
 }
 
 float ARtsUnitCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
