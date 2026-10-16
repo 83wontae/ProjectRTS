@@ -29,6 +29,7 @@ AShowRoom::AShowRoom()
 
 	HorseMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HorseMesh"));
 	HorseMesh->SetupAttachment(BodyMesh);
+	HorseMesh->SetVisibility(false);
 
 	EquipComp = CreateDefaultSubobject<UEquipComponent>(TEXT("EquipComponent"));
 
