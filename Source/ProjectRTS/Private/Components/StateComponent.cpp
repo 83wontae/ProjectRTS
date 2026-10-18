@@ -236,8 +236,19 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
     // 2. 장비 정보 추출 (EquipComponent 활용)
     if (UEquipComponent* EquipComp = GetOwner()->FindComponentByClass<UEquipComponent>())
     {
-        SaveData.HandR = EquipComp->m_RightWeaponName; //
-        SaveData.HandL = EquipComp->m_LeftWeaponName; //
+        SaveData.HandRSlot = EquipComp->m_RightWeaponSlot;
+        SaveData.HandLSlot = EquipComp->m_LeftWeaponSlot;
+        // armor slots (head/body)
+        SaveData.HeadSlot = EquipComp->m_ArmorHeadSlot;
+        SaveData.BodySlot = EquipComp->m_ArmorBodySlot;
+
+        // Confirm saved armor slots for debugging
+        if (GEngine && GetOwner())
+        {
+            FString HeadName = SaveData.HeadSlot.RowName.IsNone() ? TEXT("None") : SaveData.HeadSlot.RowName.ToString();
+            FString BodyName = SaveData.BodySlot.RowName.IsNone() ? TEXT("None") : SaveData.BodySlot.RowName.ToString();
+            UE_LOG(LogTemp, Log, TEXT("[%s] GetFullSaveData: HeadSlot='%s' BodySlot='%s'"), *GetOwner()->GetName(), *HeadName, *BodyName);
+        }
     }
 
     return SaveData;
@@ -259,8 +270,12 @@ void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
     // 3. 장비 복구 (EquipComponent에 명령)
     if (UEquipComponent* EquipComp = GetOwner()->FindComponentByClass<UEquipComponent>())
     {
-        // 무기 이름만 넣어주면 EquipToWeapon이 제약사항을 확인하여 장착합니다.
-        if (!InData.HandR.IsNone()) EquipComp->EquipToWeapon(InData.HandR);
-        if (!InData.HandL.IsNone()) EquipComp->EquipToWeapon(InData.HandL);
+        // Use new slot-based data
+        if (!InData.HandRSlot.RowName.IsNone()) EquipComp->EquipToWeapon(InData.HandRSlot.RowName);
+        if (!InData.HandLSlot.RowName.IsNone()) EquipComp->EquipToWeapon(InData.HandLSlot.RowName);
+
+        // restore armor slots (head/body)
+        EquipComp->m_ArmorHeadSlot = InData.HeadSlot;
+        EquipComp->m_ArmorBodySlot = InData.BodySlot;
     }
 }

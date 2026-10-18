@@ -23,12 +23,8 @@ void URtsSaveSubsystem::SaveGame(const FString& SlotName, int32 UserIndex)
             // 2. 컴포넌트의 리스트를 세이브 데이터로 복사
             for (const FST_UnitSaveRecord& Unit : RecruitComp->GetSavedUnitRoster())
             {
-                FST_UnitSaveRecord SaveUnit;
-                SaveUnit.UnitRowName = Unit.UnitRowName;
-                SaveUnit.HandR = Unit.HandR;
-                SaveUnit.HandL = Unit.HandL;
-                SaveUnit.UniqueId = Unit.UniqueId;
-
+                // Copy full record (includes slot fields)
+                FST_UnitSaveRecord SaveUnit = Unit;
                 SaveGameObject->SaveData.SavedUnitRoster.Add(SaveUnit);
             }
         }

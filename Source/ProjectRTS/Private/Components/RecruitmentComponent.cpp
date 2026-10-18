@@ -37,8 +37,9 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
     ActiveInfo.GrowthData.CurrentExp = NewUnit.CurrentExp;
     ActiveInfo.GrowthData.Name = NewUnit.Name;
     ActiveInfo.GrowthData.Attributes = NewUnit.AccumulatedAttributes;
-    ActiveInfo.EquipHandR = NewUnit.HandR;
-    ActiveInfo.EquipHandL = NewUnit.HandL;
+    // Use slot RowName for runtime info
+    ActiveInfo.EquipHandR = NewUnit.HandRSlot.RowName;
+    ActiveInfo.EquipHandL = NewUnit.HandLSlot.RowName;
     // CurrentHp는 로드 시 StateComponent에서 초기화될 수 있으므로 0으로 둡니다.
     ActiveInfo.CurrentHp = 0.0;
 
@@ -63,8 +64,9 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
     // 1. 초기화된 통합 구조체 생성
     FST_UnitSaveRecord NewUnit;
     NewUnit.UnitRowName = UnitRowName;
-    NewUnit.HandR = HandR;
-    NewUnit.HandL = HandL;
+    // Store as slots: populate RowName for new slot fields
+    NewUnit.HandRSlot.RowName = HandR;
+    NewUnit.HandLSlot.RowName = HandL;
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
 

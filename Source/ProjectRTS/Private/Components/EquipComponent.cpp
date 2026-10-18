@@ -33,11 +33,11 @@ void UEquipComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UEquipComponent, m_RightWeaponName);
-	DOREPLIFETIME(UEquipComponent, m_LeftWeaponName);
-	DOREPLIFETIME(UEquipComponent, m_ArmorHeadName);
-	DOREPLIFETIME(UEquipComponent, m_ArmorBodyName);
-	DOREPLIFETIME(UEquipComponent, m_ArmorHorseName);
+	DOREPLIFETIME(UEquipComponent, m_RightWeaponSlot);
+	DOREPLIFETIME(UEquipComponent, m_LeftWeaponSlot);
+	DOREPLIFETIME(UEquipComponent, m_ArmorHeadSlot);
+	DOREPLIFETIME(UEquipComponent, m_ArmorBodySlot);
+	DOREPLIFETIME(UEquipComponent, m_ArmorHorseSlot);
 	DOREPLIFETIME(UEquipComponent, m_BattleAnimType);
 }
 
@@ -72,8 +72,8 @@ void UEquipComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 
 	FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UEquipComponent, m_RightWeaponName) ||
-		PropertyName == GET_MEMBER_NAME_CHECKED(UEquipComponent, m_LeftWeaponName))
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UEquipComponent, m_RightWeaponSlot) ||
+		PropertyName == GET_MEMBER_NAME_CHECKED(UEquipComponent, m_LeftWeaponSlot))
 	{
 		// 월드가 유효하고 게임 월드가 아닐 때(에디터 뷰포트)만 실행
 		if (GetWorld() && !GetWorld()->IsGameWorld())
@@ -88,8 +88,8 @@ void UEquipComponent::RefreshWeaponsInEditor()
 {
 	// 기존에 만든 장착 로직을 재사용합니다.
 	// HandleWeaponAttachment 내부에서 이미 Destroy() 로직이 있으므로 안전합니다.
-	HandleWeaponAttachment(m_RightWeaponName, EWeaponSlot::RightHand);
-	HandleWeaponAttachment(m_LeftWeaponName, EWeaponSlot::LeftHand);
+	HandleWeaponAttachment(m_RightWeaponSlot.RowName, EWeaponSlot::RightHand);
+	HandleWeaponAttachment(m_LeftWeaponSlot.RowName, EWeaponSlot::LeftHand);
 	UpdateBattleAnimType();
 }
 
@@ -99,12 +99,12 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 
 	if (Slot == EWeaponSlot::RightHand)
 	{
-		m_RightWeaponName = WeaponName;
+		m_RightWeaponSlot.RowName = WeaponName;
 		OnRep_RightWeaponName();
 	}
 	else
 	{
-		m_LeftWeaponName = WeaponName;
+		m_LeftWeaponSlot.RowName = WeaponName;
 		OnRep_LeftWeaponName();
 	}
 	UpdateBattleAnimType();
@@ -117,9 +117,9 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 
 	switch (Type) // 
 	{
-	case EEquipType::Head: m_ArmorHeadName = ArmorName; break;
-	case EEquipType::Body: m_ArmorBodyName = ArmorName; break;
-	case EEquipType::Horse: m_ArmorHorseName = ArmorName; break;
+	case EEquipType::Head: m_ArmorHeadSlot.RowName = ArmorName; break;
+	case EEquipType::Body: m_ArmorBodySlot.RowName = ArmorName; break;
+	case EEquipType::Horse: m_ArmorHorseSlot.RowName = ArmorName; break;
 	default: break;
 	}
 
@@ -146,16 +146,16 @@ void UEquipComponent::UpdateTotalEquipStats()
 	FST_CombatStats NewEquipCombat;
 
 	// 오른손 무기 공격력 합산
-	if (WeaponTable && !m_RightWeaponName.IsNone())
+	if (WeaponTable && !m_RightWeaponSlot.RowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("")))
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT("")))
 			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
 	// 왼손 무기 공격력 합산
-	if (WeaponTable && !m_LeftWeaponName.IsNone())
+	if (WeaponTable && !m_LeftWeaponSlot.RowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("")))
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT("")))
 			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
@@ -190,9 +190,9 @@ void UEquipComponent::OnRep_RightWeaponName()
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
-	HandleWeaponAttachment(m_RightWeaponName, EWeaponSlot::RightHand);
+	HandleWeaponAttachment(m_RightWeaponSlot.RowName, EWeaponSlot::RightHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT(""));
+	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
 		OnUpdateWeapon.Broadcast(EWeaponSlot::RightHand, *Data);
@@ -207,9 +207,9 @@ void UEquipComponent::OnRep_LeftWeaponName()
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
-	HandleWeaponAttachment(m_LeftWeaponName, EWeaponSlot::LeftHand);
+	HandleWeaponAttachment(m_LeftWeaponSlot.RowName, EWeaponSlot::LeftHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT(""));
+	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
 		OnUpdateWeapon.Broadcast(EWeaponSlot::LeftHand, *Data);
@@ -223,7 +223,7 @@ void UEquipComponent::OnRep_ArmorHeadName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHeadName, TEXT(""));
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHeadSlot.RowName, TEXT(""));
 	if (Data)
 	{
 		OnUpdateArmor.Broadcast(EEquipType::Head, *Data);
@@ -238,7 +238,7 @@ void UEquipComponent::OnRep_ArmorBodyName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorBodyName, TEXT(""));
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorBodySlot.RowName, TEXT(""));
 	if (Data)
 	{
 		OnUpdateArmor.Broadcast(EEquipType::Body, *Data);
@@ -253,7 +253,7 @@ void UEquipComponent::OnRep_ArmorHorseName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHorseName, TEXT(""));
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHorseSlot.RowName, TEXT(""));
 	if (Data)
 	{
 		OnUpdateArmor.Broadcast(EEquipType::Horse, *Data);
@@ -281,8 +281,8 @@ void UEquipComponent::UpdateBattleAnimType()
 	EBattleAnimType NewType = EBattleAnimType::None;
 
 	// 2. 무기 데이터 조회 (Null 체크 포함)
-	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT(""));
-	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT(""));
+	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT(""));
+	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT(""));
 
 	// 3. 애니메이션 타입 결정 (우선순위 로직)
 	if (LeftData && LeftData->WeaponType == EWeaponType::Bow)
@@ -544,19 +544,18 @@ float UEquipComponent::GetAttackRange() const
 	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
 	// 1. 우선순위: 오른손 무기 데이터 확인
-	if (!m_RightWeaponName.IsNone())
+	if (!m_RightWeaponSlot.RowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponName, TEXT("GetRange"));
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT("GetRange"));
 		if (WeaponData) return (float)WeaponData->AttackRange;
 	}
 
 	// 2. 차순위: 왼손 무기 데이터 확인 (활이나 양손 무기 대응)
-	if (!m_LeftWeaponName.IsNone())
+	if (!m_LeftWeaponSlot.RowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponName, TEXT("GetRange"));
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT("GetRange"));
 		if (WeaponData)
 		{
-			// 무기 타입이 Shield가 아닌 경우에만 사거리로 인정하는 로직을 추가할 수도 있습니다.
 			if (WeaponData->WeaponType != EWeaponType::Shield)
 			{
 				return (float)WeaponData->AttackRange;

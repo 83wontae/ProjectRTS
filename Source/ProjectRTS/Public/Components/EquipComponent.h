@@ -60,7 +60,7 @@ public:
 	void UpdateTotalEquipStats();
 
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
-	bool IsRideState() const { return !m_ArmorHorseName.IsNone(); }
+	bool IsRideState() const { return !m_ArmorHorseSlot.RowName.IsNone(); }
 
 	/** 장착 로직 내부 처리 함수 */
 	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
@@ -99,19 +99,19 @@ public:
 
 	// --- 장비 RowName (네트워크 복제 최적화) --- 
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_RightWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_RightWeaponName;
+	FST_ItemSlot m_RightWeaponSlot;
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_LeftWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_LeftWeaponName;
+	FST_ItemSlot m_LeftWeaponSlot;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ArmorHeadName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_ArmorHeadName;
+	FST_ItemSlot m_ArmorHeadSlot;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ArmorBodyName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_ArmorBodyName;
+	FST_ItemSlot m_ArmorBodySlot;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ArmorHorseName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_ArmorHorseName;
+	FST_ItemSlot m_ArmorHorseSlot;
 
 	UPROPERTY(ReplicatedUsing = OnRep_BattleAnimType, BlueprintReadWrite, Category = "RTS|Combat")
 	EBattleAnimType m_BattleAnimType;

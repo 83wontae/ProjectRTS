@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataTable.h"
 #include "Global/RTSUnitTypes.h" // FST_Attributes를 사용하기 위해 포함
 #include "RTSSaveTypes.generated.h"
 
@@ -22,11 +23,23 @@ struct FST_UnitSaveRecord : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FName UnitRowName;
 
+    /** 오른손 슬롯 정보 (RowName, Count 등) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FName HandR; // 오른손 무기
+    FST_ItemSlot HandRSlot;
 
+    /** 왼손 슬롯 정보 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FName HandL; // 왼손 무기
+    FST_ItemSlot HandLSlot;
+
+    /** 머리 방어구 슬롯 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FST_ItemSlot HeadSlot;
+
+    /** 몸통 방어구 슬롯 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FST_ItemSlot BodySlot;
+
+    // Removed legacy FName fields HandR/HandL (migrated to HandRSlot/HandLSlot)
 
     // 2. 실시간 성장 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)

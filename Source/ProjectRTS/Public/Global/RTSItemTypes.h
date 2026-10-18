@@ -46,6 +46,10 @@ struct FST_ItemSlot : public FTableRowBase
 {
     GENERATED_BODY()
 
+    // RowName을 보관하면 슬롯이 어떤 데이터 테이블 행을 참조하는지 명확해집니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    FName RowName;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
     int32 Count = 0;
 
