@@ -10,6 +10,7 @@
 #include "ShowRoom.generated.h"
 
 class UEquipComponent;
+class URecruitmentComponent;
 class USceneComponent;
 class USkeletalMeshComponent;
 class USpringArmComponent;
@@ -71,6 +72,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Showroom|Control")
 	void UpdateUnitByUniqueId(const FGuid& UniqueId);
 
+	// Bind to recruitment equipment change notifications
+	UFUNCTION()
+	void OnUnitEquipmentChanged_Handler(const FGuid& UniqueId);
+
 	// IEquipableInterface 구현
 	virtual USkeletalMeshComponent* GetTargetAttachMesh_Implementation() const override;
 
@@ -78,8 +83,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data", meta = (ExposeOnSpawn = "true"))
 	FName UnitRowName;
 
+	// Currently displayed UniqueId
+	FGuid m_CurrentUniqueId;
+
+	// Cached RecruitmentComponent binding
+	UPROPERTY()
+	URecruitmentComponent* BoundRecruitComp;
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 	void UpdateArmorMesh(EEquipType Type, USkeletalMesh* NewMesh);

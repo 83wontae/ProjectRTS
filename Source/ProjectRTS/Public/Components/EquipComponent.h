@@ -17,6 +17,9 @@ enum class EWeaponSlot : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateWeapon, EWeaponSlot, Slot, const FST_Weapon&, NewWeapon);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnUpdateArmor, EEquipType, Type, const FST_Armor&, NewArmor);
+// Updated delegates include the owner's UniqueId so listeners can identify the source
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnUpdateWeaponWithId, const FGuid&, UniqueId, EWeaponSlot, Slot, const FST_Weapon&, NewWeapon);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnUpdateArmorWithId, const FGuid&, UniqueId, EEquipType, Type, const FST_Armor&, NewArmor);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateBattleAnimType, EBattleAnimType, NewAnimType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateRideState, bool, bIsRiding);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateUnitBody, const FST_Unit&, UnitData);
@@ -117,11 +120,19 @@ public:
 	EBattleAnimType m_BattleAnimType;
 
 	// --- 이벤트 ---
+	// Legacy two-parameter delegates (still broadcast for compatibility)
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
 	FOnUpdateWeapon OnUpdateWeapon;
 
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
 	FOnUpdateArmor OnUpdateArmor;
+
+	// New UniqueId-aware delegates
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
+	FOnUpdateWeaponWithId OnUpdateWeaponWithId;
+
+	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
+	FOnUpdateArmorWithId OnUpdateArmorWithId;
 
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Equip|Events")
 	FOnUpdateRideState OnUpdateRideState;
@@ -137,6 +148,14 @@ public:
 private:
 	UPROPERTY()
 	class ACharacter* OwnerChar;
+
+	// UniqueId of the owning unit (set by RecruitmentComponent when actor registered)
+	UPROPERTY()
+	FGuid m_OwnerUniqueId;
+
+public:
+	// Set the owner UniqueId so EquipComponent can include it in broadcasts
+	void SetOwnerUniqueId(const FGuid& InId) { m_OwnerUniqueId = InId; }
 
 protected:
 	/** 스폰할 무기 베이스 클래스 (BP_Weapon 등을 할당) */

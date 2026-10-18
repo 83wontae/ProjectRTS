@@ -109,6 +109,20 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 	}
 	UpdateBattleAnimType();
 	UpdateTotalEquipStats();
+	// Broadcast with UniqueId when changed
+	if (WeaponName.IsNone() == false)
+	{
+		UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
+		if (WeaponTable)
+		{
+			const FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("EquipWeaponByNameBroadcast"));
+			if (Data)
+			{
+				if (OnUpdateWeaponWithId.IsBound()) OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, Slot, *Data);
+				if (OnUpdateWeapon.IsBound()) OnUpdateWeapon.Broadcast(Slot, *Data);
+			}
+		}
+	}
 }
 
 void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
@@ -124,6 +138,20 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 	}
 
 	UpdateTotalEquipStats();
+	// Broadcast armor change with UniqueId
+	if (ArmorName.IsNone() == false)
+	{
+		UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
+		if (ArmorTable)
+		{
+			const FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorName, TEXT("EquipArmorByNameBroadcast"));
+			if (Data)
+			{
+				if (OnUpdateArmorWithId.IsBound()) OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, Type, *Data);
+				if (OnUpdateArmor.IsBound()) OnUpdateArmor.Broadcast(Type, *Data);
+			}
+		}
+	}
 }
 
 void UEquipComponent::EquipToUnitData(FName InUnitRowName)
@@ -195,6 +223,9 @@ void UEquipComponent::OnRep_RightWeaponName()
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		// Ensure both the new (with id) and legacy delegates are invoked for right weapon updates.
+		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
+		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::RightHand, *Data);
 		OnUpdateWeapon.Broadcast(EWeaponSlot::RightHand, *Data);
 	}
 }
@@ -212,6 +243,9 @@ void UEquipComponent::OnRep_LeftWeaponName()
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		// Ensure both the new (with id) and legacy delegates are invoked for left weapon updates.
+		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
+		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::LeftHand, *Data);
 		OnUpdateWeapon.Broadcast(EWeaponSlot::LeftHand, *Data);
 	}
 }
@@ -226,6 +260,9 @@ void UEquipComponent::OnRep_ArmorHeadName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHeadSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		// Ensure both the new (with id) and legacy delegates are invoked for head armor updates.
+		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Head, *Data);
 		OnUpdateArmor.Broadcast(EEquipType::Head, *Data);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}
@@ -241,6 +278,9 @@ void UEquipComponent::OnRep_ArmorBodyName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorBodySlot.RowName, TEXT(""));
 	if (Data)
 	{
+		// Ensure both the new (with id) and legacy delegates are invoked for body armor updates.
+		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Body, *Data);
 		OnUpdateArmor.Broadcast(EEquipType::Body, *Data);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}
@@ -256,6 +296,9 @@ void UEquipComponent::OnRep_ArmorHorseName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHorseSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		// Ensure both the new (with id) and legacy delegates are invoked for horse armor updates.
+		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Horse, *Data);
 		OnUpdateArmor.Broadcast(EEquipType::Horse, *Data);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}

@@ -6,10 +6,12 @@
 #include "Components/ActorComponent.h"
 #include "Global/ProjectRTSTypes.h"
 #include "Global/RTSSaveTypes.h" // 통합 구조체 사용
+#include "Components/EquipComponent.h"
 #include "RecruitmentComponent.generated.h"
 
 // FOnUnitRecruited 델리게이트도 통합 구조체를 전달하도록 변경
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitRecruited, const FST_UnitSaveRecord&, RecruitedUnit);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUnitEquipmentChanged, const FGuid&, UniqueId);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTRTS_API URecruitmentComponent : public UActorComponent
@@ -43,6 +45,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "RTS|Recruitment|Events")
     FOnUnitRecruited OnUnitRecruited;
 
+    // Broadcast when a unit's equipment changes (weapon/armor) at runtime
+    UPROPERTY(BlueprintAssignable, Category = "RTS|Recruitment|Events")
+    FOnUnitEquipmentChanged OnUnitEquipmentChanged;
+
     UFUNCTION(BlueprintPure, Category = "RTS|Recruitment")
     const TMap<FGuid, FST_RuntimeUnitInfo>& GetRuntimeUnitsById() const { return RuntimeUnitsById; }
 
@@ -51,7 +57,7 @@ public:
     bool TryGetActiveUnit(const FGuid& Id, FST_RuntimeUnitInfo& OutInfo) const;
 
     /** Register spawned actor for a UniqueId so other systems can find actor by id. */
-    void RegisterActorForUniqueId(const FGuid& Id, AActor* Actor);
+    void RegisterActorForUniqueId(const FGuid& Id, AActor* Actor); // no-op touch to update header timestamp
 
     /** Try to find actor instance by UniqueId. */
     bool TryGetActorByUniqueId(const FGuid& Id, AActor*& OutActor) const;
@@ -62,6 +68,14 @@ public:
     /** Internal handler when a tracked actor is destroyed. */
     UFUNCTION()
     void HandleActorDestroyed(AActor* DestroyedActor);
+
+    // Called when an EquipComponent reports a weapon change (UniqueId-aware)
+    UFUNCTION()
+    void OnAnyEquipWeaponUpdated(const FGuid& UniqueId, EWeaponSlot Slot, const FST_Weapon& NewWeapon);
+
+    // Called when an EquipComponent reports an armor change (UniqueId-aware)
+    UFUNCTION()
+    void OnAnyEquipArmorUpdated(const FGuid& UniqueId, EEquipType Type, const FST_Armor& NewArmor);
 
 private:
     /** 고용된 인재들의 명단 (세이브용 권한 데이터) */

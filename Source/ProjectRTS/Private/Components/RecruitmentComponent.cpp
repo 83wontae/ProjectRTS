@@ -12,6 +12,7 @@
 URecruitmentComponent::URecruitmentComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
+    // bind to equipment update events globally (subscribe later when actors register)
 }
 
 void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& SaveData)
@@ -98,6 +99,20 @@ void URecruitmentComponent::RegisterActorForUniqueId(const FGuid& Id, AActor* Ac
 
     // bind to actor destroyed to cleanup mappings
     Actor->OnDestroyed.AddDynamic(this, &URecruitmentComponent::HandleActorDestroyed);
+
+    // If actor has an EquipComponent, bind to its update delegates for real-time sync
+    if (Actor)
+    {
+        UEquipComponent* EquipComp = Actor->FindComponentByClass<UEquipComponent>();
+        if (EquipComp)
+        {
+            // set UniqueId on EquipComponent so it can broadcast directly
+            EquipComp->SetOwnerUniqueId(Id);
+            // Bind to the UniqueId-aware delegates
+            EquipComp->OnUpdateWeaponWithId.AddDynamic(this, &URecruitmentComponent::OnAnyEquipWeaponUpdated);
+            EquipComp->OnUpdateArmorWithId.AddDynamic(this, &URecruitmentComponent::OnAnyEquipArmorUpdated);
+        }
+    }
 }
 
 bool URecruitmentComponent::TryGetActorByUniqueId(const FGuid& Id, AActor*& OutActor) const
@@ -126,6 +141,17 @@ void URecruitmentComponent::UnregisterActorForUniqueId(const FGuid& Id)
         Actor->OnDestroyed.RemoveAll(this);
     }
     UniqueIdToActor.Remove(Id);
+}
+
+void URecruitmentComponent::OnAnyEquipWeaponUpdated(const FGuid& UniqueId, EWeaponSlot Slot, const FST_Weapon& NewWeapon)
+{
+    // Relay the unique-id-aware event to Blueprint listeners
+    if (OnUnitEquipmentChanged.IsBound()) OnUnitEquipmentChanged.Broadcast(UniqueId);
+}
+
+void URecruitmentComponent::OnAnyEquipArmorUpdated(const FGuid& UniqueId, EEquipType Type, const FST_Armor& NewArmor)
+{
+    if (OnUnitEquipmentChanged.IsBound()) OnUnitEquipmentChanged.Broadcast(UniqueId);
 }
 
 void URecruitmentComponent::HandleActorDestroyed(AActor* DestroyedActor)

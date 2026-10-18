@@ -104,6 +104,30 @@ AShowRoom::AShowRoom()
 	ApplyShowroomLightingChannel(HorseMesh);
 }
 
+void AShowRoom::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Unbind to avoid dangling delegates
+	if (BoundRecruitComp)
+	{
+		BoundRecruitComp->OnUnitEquipmentChanged.RemoveDynamic(this, &AShowRoom::OnUnitEquipmentChanged_Handler);
+		BoundRecruitComp = nullptr;
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void AShowRoom::OnUnitEquipmentChanged_Handler(const FGuid& UniqueId)
+{
+	// Only refresh if the event matches the currently displayed UniqueId
+	if (!m_CurrentUniqueId.IsValid() || UniqueId != m_CurrentUniqueId)
+	{
+		return;
+	}
+
+	// Re-apply using the same UpdateUnitByUniqueId path
+	UpdateUnitByUniqueId(m_CurrentUniqueId);
+}
+
 void AShowRoom::ApplyShowroomLightingChannel(UPrimitiveComponent* TargetComp)
 {
 	if (TargetComp)
@@ -157,6 +181,25 @@ void AShowRoom::RefreshCapture()
 	{
 		SceneCaptureComp->CaptureScene();
 	}
+
+	// Safe bind to RecruitmentComponent here as BeginPlay may be called after other systems are ready
+	if (!BoundRecruitComp)
+	{
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
+			if (PC)
+			{
+				URecruitmentComponent* RecruitComp = PC->FindComponentByClass<URecruitmentComponent>();
+				if (RecruitComp)
+				{
+					BoundRecruitComp = RecruitComp;
+					BoundRecruitComp->OnUnitEquipmentChanged.AddDynamic(this, &AShowRoom::OnUnitEquipmentChanged_Handler);
+				}
+			}
+		}
+	}
 }
 
 void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
@@ -172,12 +215,22 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 	URecruitmentComponent* RecruitComp = PC->FindComponentByClass<URecruitmentComponent>();
 	if (!RecruitComp) return;
 
-	FST_RuntimeUnitInfo Info;
-	if (!RecruitComp->TryGetActiveUnit(UniqueId, Info)) return;
+	// Find saved unit record by UniqueId from RecruitmentComponent
+	const TArray<FST_UnitSaveRecord>& Roster = RecruitComp->GetSavedUnitRoster();
+	const FST_UnitSaveRecord* FoundRecord = nullptr;
+	for (const FST_UnitSaveRecord& Rec : Roster)
+	{
+		if (Rec.UniqueId == UniqueId)
+		{
+			FoundRecord = &Rec;
+			break;
+		}
+	}
+	if (!FoundRecord) return;
 
-	// 기본 유닛 데이터로 본체 메시 교체
-	UnitRowName = Info.UnitRowName;
-
+	// Apply base unit body
+	UnitRowName = FoundRecord->UnitRowName;
+	m_CurrentUniqueId = UniqueId;
 	UDataTable* UnitTable = RtsSettings::GetUnitTable(this);
 	if (UnitTable && !UnitRowName.IsNone())
 	{
@@ -188,13 +241,15 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 		}
 	}
 
-	// 장비 정보 적용
+	// RecruitmentComponent binding done in BeginPlay; no-op here
+
+	// Apply equipment from save record (use slot RowName)
 	if (EquipComp)
 	{
-		if (!Info.EquipHandR.IsNone()) EquipComp->EquipToWeapon(Info.EquipHandR);
-		if (!Info.EquipHandL.IsNone()) EquipComp->EquipToWeapon(Info.EquipHandL);
-		if (!Info.EquipHead.IsNone()) EquipComp->EquipArmorByName(Info.EquipHead, EEquipType::Head);
-		if (!Info.EquipBody.IsNone()) EquipComp->EquipArmorByName(Info.EquipBody, EEquipType::Body);
+		if (!FoundRecord->HandRSlot.RowName.IsNone()) EquipComp->EquipToWeapon(FoundRecord->HandRSlot.RowName);
+		if (!FoundRecord->HandLSlot.RowName.IsNone()) EquipComp->EquipToWeapon(FoundRecord->HandLSlot.RowName);
+		if (!FoundRecord->HeadSlot.RowName.IsNone()) EquipComp->EquipArmorByName(FoundRecord->HeadSlot.RowName, EEquipType::Head);
+		if (!FoundRecord->BodySlot.RowName.IsNone()) EquipComp->EquipArmorByName(FoundRecord->BodySlot.RowName, EEquipType::Body);
 	}
 
 	// 캡처 갱신
