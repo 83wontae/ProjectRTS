@@ -242,6 +242,36 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
         SaveData.HeadSlot = EquipComp->m_ArmorHeadSlot;
         SaveData.BodySlot = EquipComp->m_ArmorBodySlot;
 
+        // If any slot references an InstanceId, ensure the instance entry is included
+        if (SaveData.HandRSlot.InstanceId.IsValid())
+        {
+            FST_ItemInstance Inst;
+            Inst.InstanceId = SaveData.HandRSlot.InstanceId;
+            Inst.RowName = SaveData.HandRSlot.RowName;
+            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+        }
+        if (SaveData.HandLSlot.InstanceId.IsValid())
+        {
+            FST_ItemInstance Inst;
+            Inst.InstanceId = SaveData.HandLSlot.InstanceId;
+            Inst.RowName = SaveData.HandLSlot.RowName;
+            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+        }
+        if (SaveData.HeadSlot.InstanceId.IsValid())
+        {
+            FST_ItemInstance Inst;
+            Inst.InstanceId = SaveData.HeadSlot.InstanceId;
+            Inst.RowName = SaveData.HeadSlot.RowName;
+            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+        }
+        if (SaveData.BodySlot.InstanceId.IsValid())
+        {
+            FST_ItemInstance Inst;
+            Inst.InstanceId = SaveData.BodySlot.InstanceId;
+            Inst.RowName = SaveData.BodySlot.RowName;
+            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+        }
+
         // Confirm saved armor slots for debugging
         if (GEngine && GetOwner())
         {
@@ -270,12 +300,23 @@ void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
     // 3. 장비 복구 (EquipComponent에 명령)
     if (UEquipComponent* EquipComp = GetOwner()->FindComponentByClass<UEquipComponent>())
     {
-        // Use new slot-based data
-        if (!InData.HandRSlot.RowName.IsNone()) EquipComp->EquipToWeapon(InData.HandRSlot.RowName);
-        if (!InData.HandLSlot.RowName.IsNone()) EquipComp->EquipToWeapon(InData.HandLSlot.RowName);
+        // Restore slot structs directly so InstanceId (if any) is preserved
+        EquipComp->m_RightWeaponSlot = InData.HandRSlot;
+        EquipComp->m_LeftWeaponSlot = InData.HandLSlot;
 
         // restore armor slots (head/body)
         EquipComp->m_ArmorHeadSlot = InData.HeadSlot;
         EquipComp->m_ArmorBodySlot = InData.BodySlot;
+
+        // If a slot references an InstanceId, prefer restoring the instance mapping
+        // and then attempt to equip by RowName so the visual/spawned weapon is created.
+        if (!EquipComp->m_RightWeaponSlot.RowName.IsNone())
+        {
+            EquipComp->EquipToWeapon(EquipComp->m_RightWeaponSlot.RowName);
+        }
+        if (!EquipComp->m_LeftWeaponSlot.RowName.IsNone())
+        {
+            EquipComp->EquipToWeapon(EquipComp->m_LeftWeaponSlot.RowName);
+        }
     }
 }

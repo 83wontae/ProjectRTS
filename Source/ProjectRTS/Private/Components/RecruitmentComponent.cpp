@@ -207,14 +207,16 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
         {
             SpawnedUnit->SpawnDefaultController(); // AI 빙의
 
-            // 6. 상태 및 장비 복구 (통합 데이터 주입)
+            // 6. 먼저 UniqueId를 세팅하고 매핑을 등록하여 EquipComponent가
+            //    LoadFromFullSaveData 시점에 UniqueId-aware 브로드캐스트를 받을 수 있게 합니다.
+            SpawnedUnit->UniqueId = RecruitData.UniqueId;
+            RegisterActorForUniqueId(RecruitData.UniqueId, SpawnedUnit);
+
+            // 상태 및 장비 복구 (통합 데이터 주입)
             if (SpawnedUnit->StateComp)
             {
                 SpawnedUnit->StateComp->LoadFromFullSaveData(RecruitData);
             }
-            // ensure actor's UniqueId is set and register mapping
-            SpawnedUnit->UniqueId = RecruitData.UniqueId;
-            RegisterActorForUniqueId(RecruitData.UniqueId, SpawnedUnit);
         }
     }
 }

@@ -5,13 +5,14 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Global/RTSUnitTypes.h" // FST_Attributes를 사용하기 위해 포함
+#include "Global/RTSItemTypes.h" // ItemInstance / ItemSlot 정의
 #include "RTSSaveTypes.generated.h"
 
 /** * 개별 인재(유닛)의 저장 데이터
  * 유닛의 고유 식별자와 무한 성장으로 쌓아온 결과물을 기록합니다.
  */
 USTRUCT(BlueprintType)
-struct FST_UnitSaveRecord : public FTableRowBase
+struct FST_UnitSaveRecord
 {
     GENERATED_BODY()
 
@@ -39,20 +40,25 @@ struct FST_UnitSaveRecord : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FST_ItemSlot BodySlot;
 
-    // Removed legacy FName fields HandR/HandL (migrated to HandRSlot/HandLSlot)
+    /**
+     * 이 유닛이 보유한 개별 인스턴스 아이템 맵.
+     * 슬롯이 InstanceId를 가리키는 경우 이 맵에서 상태를 찾습니다.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TMap<FGuid, FST_ItemInstance> ItemInstances;
 
     // 2. 실시간 성장 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FString Name = "UnitName";
+    FString Name;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    int32 Level = 1;
+    int32 Level;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    double CurrentExp = 0.0;
+    double CurrentExp;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FName CurrentJob = TEXT("Novice");
+    FName CurrentJob;
 
     /** 무한 성장의 핵심: 누적된 순수 속성치 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -63,7 +69,7 @@ struct FST_UnitSaveRecord : public FTableRowBase
  * 보유한 인재 리스트와 자원, 진행도 등을 담습니다.
  */
 USTRUCT(BlueprintType)
-struct FST_SaveGameData : public FTableRowBase
+struct FST_SaveGameData
 {
     GENERATED_BODY()
 
@@ -73,7 +79,7 @@ struct FST_SaveGameData : public FTableRowBase
 
     /** 보유 자원 (금광, 식량 등) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    int32 Gold = 0;
+    int32 Gold;
 
     /** 현재 진행 중인 스테이지 또는 시나리오 정보 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)

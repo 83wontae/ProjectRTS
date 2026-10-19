@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Global/RTSCoreTypes.h" // 기초 타입 활용을 위해 포함
+#include "Misc/Guid.h"
 #include "RTSItemTypes.generated.h"
 
 // 1. 공통 아이템 분류
@@ -55,6 +56,44 @@ struct FST_ItemSlot : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
     FST_ItemBase ItemData;
+
+    // 비스택(인스턴스) 아이템의 경우 이 슬롯은 InstanceId로 참조합니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    FGuid InstanceId;
+
+    // 스택 가능 여부
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    bool bIsStackable = true;
+};
+
+/**
+ * 인스턴스형 아이템(무기/방패/갑옷 등)의 런타임/저장 상태를 보관하는 구조체
+ * 슬롯은 인스턴스가 필요할 경우 InstanceId로 이 맵을 참조합니다.
+ */
+USTRUCT(BlueprintType)
+struct FST_ItemInstance
+{
+    GENERATED_BODY()
+
+    // 고유 인스턴스 식별자
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    FGuid InstanceId;
+
+    // 참조하는 데이터테이블 행
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    FName RowName;
+
+    // 내구도 (필요하지 않으면 -1)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    int32 Durability = -1;
+
+    // 강화 레벨
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    int32 UpgradeLevel = 0;
+
+    // 확장 속성(추가 상태 저장이 필요할 때 사용)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    TMap<FName, FString> ExtraProps;
 };
 
 /** * 무기 유형
