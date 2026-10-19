@@ -71,6 +71,99 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
 
+    // If initial equipment row names provided, create item instances only for instance-type items
+    static const FString ContextString(TEXT("AddUnitToRoster_Context"));
+    if (!HandR.IsNone())
+    {
+        bool bShouldCreateInstance = false;
+
+        // Check weapon table
+        if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
+        {
+            const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandR, ContextString);
+            if (FoundW)
+            {
+                // Use explicit bIsInstance or MaxStackCount heuristic
+                if (FoundW->bIsInstance || FoundW->MaxStackCount <= 1)
+                {
+                    bShouldCreateInstance = true;
+                }
+            }
+        }
+
+        // Check armor table
+        if (!bShouldCreateInstance)
+        {
+            if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
+            {
+                const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandR, ContextString);
+                if (FoundA)
+                {
+                    if (FoundA->bIsInstance || FoundA->MaxStackCount <= 1)
+                    {
+                        bShouldCreateInstance = true;
+                    }
+                }
+            }
+        }
+
+        // Fallback: if an ItemData table exists on owner components (Inventory), we could check MaxStackCount
+        if (!bShouldCreateInstance)
+        {
+            // no global item table in settings; assume non-instance by default
+            bShouldCreateInstance = false;
+        }
+
+        if (bShouldCreateInstance)
+        {
+            FGuid InstId = FGuid::NewGuid();
+            NewUnit.HandRSlot.InstanceId = InstId;
+            FST_ItemInstance Inst;
+            Inst.InstanceId = InstId;
+            Inst.RowName = HandR;
+            NewUnit.ItemInstances.Add(InstId, Inst);
+        }
+        else
+        {
+            // store as simple RowName (no InstanceId)
+            NewUnit.HandRSlot.RowName = HandR;
+        }
+    }
+
+    if (!HandL.IsNone())
+    {
+        bool bShouldCreateInstance = false;
+
+        if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
+        {
+            const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandL, ContextString);
+            if (FoundW) { if (FoundW->bIsInstance || FoundW->MaxStackCount <= 1) bShouldCreateInstance = true; }
+        }
+
+        if (!bShouldCreateInstance)
+        {
+            if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
+            {
+                const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandL, ContextString);
+                if (FoundA) { if (FoundA->bIsInstance || FoundA->MaxStackCount <= 1) bShouldCreateInstance = true; }
+            }
+        }
+
+        if (bShouldCreateInstance)
+        {
+            FGuid InstId = FGuid::NewGuid();
+            NewUnit.HandLSlot.InstanceId = InstId;
+            FST_ItemInstance Inst;
+            Inst.InstanceId = InstId;
+            Inst.RowName = HandL;
+            NewUnit.ItemInstances.Add(InstId, Inst);
+        }
+        else
+        {
+            NewUnit.HandLSlot.RowName = HandL;
+        }
+    }
+
     SavedUnitRoster.Add(NewUnit);
 
     if (OnUnitRecruited.IsBound())

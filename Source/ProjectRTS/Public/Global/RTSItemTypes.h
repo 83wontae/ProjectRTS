@@ -25,6 +25,11 @@ struct FST_ItemBase : public FTableRowBase
 {
     GENERATED_BODY()
 
+    FST_ItemBase()
+        : DisplayName(), ItemType(EItemType::None), IconSprite(nullptr), WorldMesh(nullptr), MaxStackCount(1), bIsInstance(false)
+    {
+    }
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
     FText DisplayName;
 
@@ -39,6 +44,13 @@ struct FST_ItemBase : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
     int32 MaxStackCount = 1;
+
+    /**
+     * If true, this item should be treated as an instance (unique identity)
+     * even if MaxStackCount > 1. Useful for weapons/armors that require per-instance state.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
+    bool bIsInstance = false;
 };
 
 // 아이템 슬롯 구조체
