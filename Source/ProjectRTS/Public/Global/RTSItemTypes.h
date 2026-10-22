@@ -95,6 +95,10 @@ struct FST_ItemInstance
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FName RowName;
 
+    // 인스턴스가 참조하는 기본 아이템 정보
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    FST_ItemBase ItemData;
+
     // 내구도 (필요하지 않으면 -1)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     int32 Durability = -1;
@@ -189,7 +193,4 @@ struct FST_Armor : public FST_ItemBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Armor")
     TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Armor")
-    TSoftObjectPtr<UTexture2D> Icon;
 };

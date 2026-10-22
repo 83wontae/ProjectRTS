@@ -248,6 +248,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
             FST_ItemInstance Inst;
             Inst.InstanceId = SaveData.HandRSlot.InstanceId;
             Inst.RowName = SaveData.HandRSlot.RowName;
+            Inst.ItemData = SaveData.HandRSlot.ItemData;
             SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
         }
         if (SaveData.HandLSlot.InstanceId.IsValid())
@@ -255,6 +256,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
             FST_ItemInstance Inst;
             Inst.InstanceId = SaveData.HandLSlot.InstanceId;
             Inst.RowName = SaveData.HandLSlot.RowName;
+            Inst.ItemData = SaveData.HandLSlot.ItemData;
             SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
         }
         if (SaveData.HeadSlot.InstanceId.IsValid())
@@ -262,6 +264,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
             FST_ItemInstance Inst;
             Inst.InstanceId = SaveData.HeadSlot.InstanceId;
             Inst.RowName = SaveData.HeadSlot.RowName;
+            Inst.ItemData = SaveData.HeadSlot.ItemData;
             SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
         }
         if (SaveData.BodySlot.InstanceId.IsValid())
@@ -269,6 +272,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
             FST_ItemInstance Inst;
             Inst.InstanceId = SaveData.BodySlot.InstanceId;
             Inst.RowName = SaveData.BodySlot.RowName;
+            Inst.ItemData = SaveData.BodySlot.ItemData;
             SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
         }
 

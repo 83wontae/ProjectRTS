@@ -19,6 +19,12 @@ UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
 	SetIsReplicatedByDefault(true);
 }
 
+void UEquipComponent::UpdateSlotItemData(FST_ItemSlot& Slot, const FST_ItemBase& ItemData) const
+{
+	Slot.ItemData = ItemData;
+	Slot.bIsStackable = !ItemData.bIsInstance && ItemData.MaxStackCount > 1;
+}
+
 // Called when the game starts
 void UEquipComponent::BeginPlay()
 {
@@ -100,11 +106,25 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 	if (Slot == EWeaponSlot::RightHand)
 	{
 		m_RightWeaponSlot.RowName = WeaponName;
+		if (UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner()))
+		{
+			if (const FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("EquipWeaponByName")))
+			{
+				UpdateSlotItemData(m_RightWeaponSlot, static_cast<const FST_ItemBase&>(*Data));
+			}
+		}
 		OnRep_RightWeaponName();
 	}
 	else
 	{
 		m_LeftWeaponSlot.RowName = WeaponName;
+		if (UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner()))
+		{
+			if (const FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("EquipWeaponByName")))
+			{
+				UpdateSlotItemData(m_LeftWeaponSlot, static_cast<const FST_ItemBase&>(*Data));
+			}
+		}
 		OnRep_LeftWeaponName();
 	}
 	UpdateBattleAnimType();
@@ -135,6 +155,25 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 	case EEquipType::Body: m_ArmorBodySlot.RowName = ArmorName; break;
 	case EEquipType::Horse: m_ArmorHorseSlot.RowName = ArmorName; break;
 	default: break;
+	}
+
+	if (UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner()))
+	{
+		if (const FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorName, TEXT("EquipArmorByName")))
+		{
+			FST_ItemSlot* Slot = nullptr;
+			switch (Type)
+			{
+			case EEquipType::Head: Slot = &m_ArmorHeadSlot; break;
+			case EEquipType::Body: Slot = &m_ArmorBodySlot; break;
+			case EEquipType::Horse: Slot = &m_ArmorHorseSlot; break;
+			default: break;
+			}
+			if (Slot)
+			{
+				UpdateSlotItemData(*Slot, static_cast<const FST_ItemBase&>(*Data));
+			}
+		}
 	}
 
 	UpdateTotalEquipStats();
@@ -223,6 +262,7 @@ void UEquipComponent::OnRep_RightWeaponName()
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_RightWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		UpdateSlotItemData(m_RightWeaponSlot, static_cast<const FST_ItemBase&>(*Data));
 		// Ensure both the new (with id) and legacy delegates are invoked for right weapon updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
 		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::RightHand, *Data);
@@ -243,6 +283,7 @@ void UEquipComponent::OnRep_LeftWeaponName()
 	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(m_LeftWeaponSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		UpdateSlotItemData(m_LeftWeaponSlot, static_cast<const FST_ItemBase&>(*Data));
 		// Ensure both the new (with id) and legacy delegates are invoked for left weapon updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
 		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::LeftHand, *Data);
@@ -260,6 +301,7 @@ void UEquipComponent::OnRep_ArmorHeadName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHeadSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		UpdateSlotItemData(m_ArmorHeadSlot, static_cast<const FST_ItemBase&>(*Data));
 		// Ensure both the new (with id) and legacy delegates are invoked for head armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
 		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Head, *Data);
@@ -278,6 +320,7 @@ void UEquipComponent::OnRep_ArmorBodyName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorBodySlot.RowName, TEXT(""));
 	if (Data)
 	{
+		UpdateSlotItemData(m_ArmorBodySlot, static_cast<const FST_ItemBase&>(*Data));
 		// Ensure both the new (with id) and legacy delegates are invoked for body armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
 		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Body, *Data);
@@ -296,6 +339,7 @@ void UEquipComponent::OnRep_ArmorHorseName()
 	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(m_ArmorHorseSlot.RowName, TEXT(""));
 	if (Data)
 	{
+		UpdateSlotItemData(m_ArmorHorseSlot, static_cast<const FST_ItemBase&>(*Data));
 		// Ensure both the new (with id) and legacy delegates are invoked for horse armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
 		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Horse, *Data);

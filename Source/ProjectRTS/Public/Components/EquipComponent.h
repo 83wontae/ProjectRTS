@@ -146,6 +146,8 @@ public:
 	FOnUpdateUnitBody OnUpdateUnitBody;
 
 private:
+	void UpdateSlotItemData(FST_ItemSlot& Slot, const FST_ItemBase& ItemData) const;
+
 	UPROPERTY()
 	class ACharacter* OwnerChar;
 

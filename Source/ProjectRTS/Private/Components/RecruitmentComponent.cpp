@@ -73,6 +73,17 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
 
     // If initial equipment row names provided, create item instances only for instance-type items
     static const FString ContextString(TEXT("AddUnitToRoster_Context"));
+    const auto CopyBaseItemData = [](const FST_ItemBase& Source, FST_ItemInstance& Instance, FST_ItemSlot& Slot)
+    {
+        Instance.ItemData.DisplayName = Source.DisplayName;
+        Instance.ItemData.ItemType = Source.ItemType;
+        Instance.ItemData.IconSprite = Source.IconSprite;
+        Instance.ItemData.WorldMesh = Source.WorldMesh;
+        Instance.ItemData.MaxStackCount = Source.MaxStackCount;
+        Instance.ItemData.bIsInstance = Source.bIsInstance;
+        Slot.ItemData = Instance.ItemData;
+    };
+
     if (!HandR.IsNone())
     {
         bool bShouldCreateInstance = false;
@@ -121,6 +132,24 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
             FST_ItemInstance Inst;
             Inst.InstanceId = InstId;
             Inst.RowName = HandR;
+
+            if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
+            {
+                if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandR, ContextString))
+                {
+                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst, NewUnit.HandRSlot);
+                }
+            }
+            if (Inst.ItemData.ItemType == EItemType::None)
+            {
+                if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
+                {
+                    if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandR, ContextString))
+                    {
+                        CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst, NewUnit.HandRSlot);
+                    }
+                }
+            }
             NewUnit.ItemInstances.Add(InstId, Inst);
         }
         else
@@ -156,6 +185,24 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
             FST_ItemInstance Inst;
             Inst.InstanceId = InstId;
             Inst.RowName = HandL;
+
+            if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
+            {
+                if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandL, ContextString))
+                {
+                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst, NewUnit.HandLSlot);
+                }
+            }
+            if (Inst.ItemData.ItemType == EItemType::None)
+            {
+                if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
+                {
+                    if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandL, ContextString))
+                    {
+                        CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst, NewUnit.HandLSlot);
+                    }
+                }
+            }
             NewUnit.ItemInstances.Add(InstId, Inst);
         }
         else
