@@ -58,6 +58,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FST_ItemSlot> Slots;
 
+	// 슬롯이 참조하는 아이템 인스턴스 저장소
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	TMap<FGuid, FST_ItemInstance> ItemInstances;
+
 	// OnInventoryChanged / ChangeInven 델리게이트
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryChangedSignature OnInventoryChanged;

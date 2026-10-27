@@ -43,26 +43,13 @@ void UInventoryComponent::SetEmptySlot(int32 Index)
 		return;
 	}
 
-	// 2. 데이터 테이블 유효성 검사
-	if (!ItemDataTable)
+	if (Slots[Index].InstanceId.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SetEmptySlot: ItemDataTable is not set."));
-		return;
+		ItemInstances.Remove(Slots[Index].InstanceId);
 	}
 
-	// 3. Get Data Table Row (Row Name: "Empty")
-	static const FString ContextString(TEXT("SetEmptySlotContext"));
-	const FST_ItemBase* EmptyItemData = ItemDataTable->FindRow<FST_ItemBase>(FName("Empty"), ContextString);
-
-	if (!EmptyItemData)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("SetEmptySlot: 'Empty' row not found in DataTable."));
-		return;
-	}
-
-	// 4. Set members in ST_ItemSlot (Slots[Index]의 ItemData 교체 및 수량 초기화)
-	Slots[Index].ItemData = *EmptyItemData;
-	Slots[Index].Count = 0; // 빈 슬롯이므로 수량도 0으로 초기화
+	Slots[Index].RowName = NAME_None;
+	Slots[Index].InstanceId.Invalidate();
 
 	// 5. Call Event Dispatcher ChangeInven
 	OnInventoryChanged.Broadcast();
@@ -76,8 +63,7 @@ bool UInventoryComponent::IsEmptySlot(int32 Index) const
 		return false;
 	}
 
-	// Slots[Index]의 ItemData.ItemType이 EItemType::None인지 확인하여 빈 슬롯 여부 반환
-	return Slots[Index].ItemData.ItemType == EItemType::None;
+	return Slots[Index].RowName.IsNone();
 }
 
 void UInventoryComponent::RemoveItem(int32 Index)
@@ -115,31 +101,15 @@ void UInventoryComponent::CreateInvenSlots(int32 Count)
 		return;
 	}
 
-	if (!ItemDataTable)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("CreateInvenSlots: ItemDataTable is not set."));
-		return;
-	}
-
-	// 2. DT_Item에서 RowName이 "Empty"인 행 가져오기
-	static const FString ContextString(TEXT("CreateInvenSlotsContext"));
-	const FST_ItemBase* EmptyItemData = ItemDataTable->FindRow<FST_ItemBase>(FName("Empty"), ContextString);
-
-	if (!EmptyItemData)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("CreateInvenSlots: 'Empty' row not found in DataTable."));
-		return;
-	}
-
-	// 3. Make ST_ItemSlot (Count: 0, ItemData: EmptyItemData)
+	// 2. 빈 슬롯 템플릿 생성
 	FST_ItemSlot NewEmptySlot;
-	NewEmptySlot.Count = 0;
-	NewEmptySlot.ItemData = *EmptyItemData;
+	NewEmptySlot.RowName = NAME_None;
+	NewEmptySlot.InstanceId.Invalidate();
 
 	// 메모리 재할당 방지를 위한 공간 미리 확보
 	Slots.Reserve(Slots.Num() + Count);
 
-	// 4. For Loop: 0 ~ (Count - 1) 만큼 슬롯 추가 (ADD Slots)
+	// 3. For Loop: 0 ~ (Count - 1) 만큼 슬롯 추가 (ADD Slots)
 	for (int32 i = 0; i < Count; ++i)
 	{
 		Slots.Add(NewEmptySlot);
@@ -179,8 +149,16 @@ void UInventoryComponent::AddItem(FName RowName)
 		// 5. Set Array Elem: 찾은 슬롯 인덱스에 데이터 갱신
 		if (Slots.IsValidIndex(EmptySlotIndex))
 		{
-			Slots[EmptySlotIndex].ItemData = *FoundItem;
-			Slots[EmptySlotIndex].Count = 1;
+			FGuid InstanceId = FGuid::NewGuid();
+			Slots[EmptySlotIndex].RowName = RowName;
+			Slots[EmptySlotIndex].InstanceId = InstanceId;
+
+			FST_ItemInstance NewInstance;
+			NewInstance.InstanceId = InstanceId;
+			NewInstance.RowName = RowName;
+			NewInstance.Quantity = 1;
+			NewInstance.ItemData = *FoundItem;
+			ItemInstances.Add(InstanceId, NewInstance);
 
 			// 6. Call Event Dispatcher (ChangeInven 이벤트 브로드캐스트)
 			OnInventoryChanged.Broadcast();

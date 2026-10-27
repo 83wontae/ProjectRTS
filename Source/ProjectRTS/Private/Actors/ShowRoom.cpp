@@ -243,13 +243,45 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 
 	// RecruitmentComponent binding done in BeginPlay; no-op here
 
-	// Apply equipment from save record (use slot RowName)
+	// Apply equipment from save record (EquipSlots + ItemInstances)
 	if (EquipComp)
 	{
-		if (!FoundRecord->HandRSlot.RowName.IsNone()) EquipComp->EquipToWeapon(FoundRecord->HandRSlot.RowName);
-		if (!FoundRecord->HandLSlot.RowName.IsNone()) EquipComp->EquipToWeapon(FoundRecord->HandLSlot.RowName);
-		if (!FoundRecord->HeadSlot.RowName.IsNone()) EquipComp->EquipArmorByName(FoundRecord->HeadSlot.RowName, EEquipType::Head);
-		if (!FoundRecord->BodySlot.RowName.IsNone()) EquipComp->EquipArmorByName(FoundRecord->BodySlot.RowName, EEquipType::Body);
+		EquipComp->ClearAllEquipSlots();
+
+		const int32 MaxSlotCount = static_cast<int32>(EUnitEquipSlot::Max);
+		const int32 LoopCount = FMath::Min(FoundRecord->EquipSlots.Num(), MaxSlotCount);
+
+		for (int32 SlotIndex = 0; SlotIndex < LoopCount; ++SlotIndex)
+		{
+			const EUnitEquipSlot SlotType = static_cast<EUnitEquipSlot>(SlotIndex);
+			const FST_ItemSlot& SavedSlot = FoundRecord->EquipSlots[SlotIndex];
+
+			if (SavedSlot.RowName.IsNone())
+			{
+				EquipComp->ClearEquipSlot(SlotType);
+				continue;
+			}
+
+			FST_ItemInstance ItemInstance;
+			if (SavedSlot.InstanceId.IsValid())
+			{
+				if (const FST_ItemInstance* FoundInstance = FoundRecord->ItemInstances.Find(SavedSlot.InstanceId))
+				{
+					ItemInstance = *FoundInstance;
+				}
+			}
+
+			if (ItemInstance.RowName.IsNone())
+			{
+				ItemInstance.RowName = SavedSlot.RowName;
+			}
+			if (!ItemInstance.InstanceId.IsValid())
+			{
+				ItemInstance.InstanceId = SavedSlot.InstanceId.IsValid() ? SavedSlot.InstanceId : FGuid::NewGuid();
+			}
+
+			EquipComp->EquipItemInstance(ItemInstance, SlotType);
+		}
 	}
 
 	// 캡처 갱신

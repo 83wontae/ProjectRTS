@@ -19,6 +19,17 @@ enum class EItemType : uint8
     Etc         UMETA(DisplayName = "기타")
 };
 
+UENUM(BlueprintType)
+enum class EUnitEquipSlot : uint8
+{
+    HandR UMETA(DisplayName = "Right Hand"),
+    HandL UMETA(DisplayName = "Left Hand"),
+    Head UMETA(DisplayName = "Head"),
+    Body UMETA(DisplayName = "Body"),
+    Horse UMETA(DisplayName = "Horse"),
+    Max UMETA(Hidden)
+};
+
 // 2. 기본 베이스 아이템 구조체
 USTRUCT(BlueprintType)
 struct FST_ItemBase : public FTableRowBase
@@ -26,7 +37,7 @@ struct FST_ItemBase : public FTableRowBase
     GENERATED_BODY()
 
     FST_ItemBase()
-        : DisplayName(), ItemType(EItemType::None), IconSprite(nullptr), WorldMesh(nullptr), MaxStackCount(1), bIsInstance(false)
+        : DisplayName(), ItemType(EItemType::None), IconSprite(nullptr), WorldMesh(nullptr), MaxStackCount(1)
     {
     }
 
@@ -44,13 +55,6 @@ struct FST_ItemBase : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
     int32 MaxStackCount = 1;
-
-    /**
-     * If true, this item should be treated as an instance (unique identity)
-     * even if MaxStackCount > 1. Useful for weapons/armors that require per-instance state.
-     */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
-    bool bIsInstance = false;
 };
 
 // 아이템 슬롯 구조체
@@ -63,19 +67,9 @@ struct FST_ItemSlot : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
     FName RowName;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
-    int32 Count = 0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
-    FST_ItemBase ItemData;
-
-    // 비스택(인스턴스) 아이템의 경우 이 슬롯은 InstanceId로 참조합니다.
+    // 슬롯이 참조하는 인스턴스 ID
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
     FGuid InstanceId;
-
-    // 스택 가능 여부
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
-    bool bIsStackable = true;
 };
 
 /**
@@ -95,6 +89,11 @@ struct FST_ItemInstance
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FName RowName;
 
+    // 인스턴스가 보유한 수량
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    int32 Quantity = 1;
+
+    // 레거시 호환 필드 (정적 정의 복사본)
     // 인스턴스가 참조하는 기본 아이템 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FST_ItemBase ItemData;

@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void EquipWeaponByName(FName WeaponName, EWeaponSlot Slot);
 
+	/** 인스턴스 정보를 사용하여 무기를 장착합니다. */
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void EquipItemInstance(const FST_ItemInstance& ItemInstance, EUnitEquipSlot SlotType);
+
 	/** RowName을 사용하여 방어구를 장착합니다. */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void EquipArmorByName(FName ArmorName, EEquipType Type);
@@ -63,7 +67,7 @@ public:
 	void UpdateTotalEquipStats();
 
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
-	bool IsRideState() const { return !m_ArmorHorseSlot.RowName.IsNone(); }
+	bool IsRideState() const;
 
 	/** 장착 로직 내부 처리 함수 */
 	void HandleWeaponAttachment(FName WeaponName, EWeaponSlot RequestedSlot);
@@ -74,6 +78,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void EquipToWeapon(FName WeaponName);
 
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void EquipToWeaponInstance(const FST_ItemInstance& ItemInstance);
+
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	bool IsEquipSlotEmpty(EUnitEquipSlot SlotType) const;
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void ClearEquipSlot(EUnitEquipSlot SlotType);
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
+	void ClearAllEquipSlots();
+
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	float GetAttackRange() const;
 
@@ -82,6 +98,7 @@ public:
 
 	// --- OnRep 함수 ---
 	UFUNCTION() void OnRep_UnitRowName();
+	UFUNCTION() void OnRep_EquipSlots();
 	UFUNCTION() void OnRep_RightWeaponName();
 	UFUNCTION() void OnRep_LeftWeaponName();
 	UFUNCTION() void OnRep_ArmorHeadName();
@@ -100,21 +117,8 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_UnitRowName, BlueprintReadWrite, Category = "RTS|Equip")
 	FName m_UnitRowName;
 
-	// --- 장비 RowName (네트워크 복제 최적화) --- 
-	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_RightWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_ItemSlot m_RightWeaponSlot;
-
-	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_LeftWeaponName, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_ItemSlot m_LeftWeaponSlot;
-
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorHeadName, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_ItemSlot m_ArmorHeadSlot;
-
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorBodyName, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_ItemSlot m_ArmorBodySlot;
-
-	UPROPERTY(ReplicatedUsing = OnRep_ArmorHorseName, BlueprintReadWrite, Category = "RTS|Equip")
-	FST_ItemSlot m_ArmorHorseSlot;
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_EquipSlots, BlueprintReadWrite, Category = "RTS|Equip")
+	TArray<FST_ItemSlot> m_EquipSlots;
 
 	UPROPERTY(ReplicatedUsing = OnRep_BattleAnimType, BlueprintReadWrite, Category = "RTS|Combat")
 	EBattleAnimType m_BattleAnimType;
@@ -146,7 +150,9 @@ public:
 	FOnUpdateUnitBody OnUpdateUnitBody;
 
 private:
-	void UpdateSlotItemData(FST_ItemSlot& Slot, const FST_ItemBase& ItemData) const;
+	EUnitEquipSlot GetSlotTypeFromWeaponSlot(EWeaponSlot Slot) const;
+	EUnitEquipSlot GetSlotTypeFromEquipType(EEquipType Type) const;
+	void ApplySlotItem(EUnitEquipSlot SlotType, const FST_ItemInstance& ItemInstance);
 
 	UPROPERTY()
 	class ACharacter* OwnerChar;
@@ -158,6 +164,10 @@ private:
 public:
 	// Set the owner UniqueId so EquipComponent can include it in broadcasts
 	void SetOwnerUniqueId(const FGuid& InId) { m_OwnerUniqueId = InId; }
+
+	int32 GetEquipSlotIndex(EUnitEquipSlot SlotType) const { return static_cast<int32>(SlotType); }
+	FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType);
+	const FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType) const;
 
 protected:
 	/** 스폰할 무기 베이스 클래스 (BP_Weapon 등을 할당) */

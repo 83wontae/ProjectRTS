@@ -16,6 +16,33 @@ struct FST_UnitSaveRecord
 {
     GENERATED_BODY()
 
+    FST_UnitSaveRecord()
+    {
+        EquipSlots.SetNum(static_cast<int32>(EUnitEquipSlot::Max));
+    }
+
+    static int32 GetEquipSlotIndex(EUnitEquipSlot SlotType)
+    {
+        return static_cast<int32>(SlotType);
+    }
+
+    FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType)
+    {
+        const int32 Index = GetEquipSlotIndex(SlotType);
+        if (!EquipSlots.IsValidIndex(Index))
+        {
+            EquipSlots.SetNum(static_cast<int32>(EUnitEquipSlot::Max));
+        }
+        return EquipSlots[Index];
+    }
+
+    const FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType) const
+    {
+        static const FST_ItemSlot EmptySlot;
+        const int32 Index = GetEquipSlotIndex(SlotType);
+        return EquipSlots.IsValidIndex(Index) ? EquipSlots[Index] : EmptySlot;
+    }
+
     /** 생성된 유니크한 유닛을 식별하기 위한 ID (세이브/로드, 네트워크 매핑에 사용) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FGuid UniqueId;
@@ -24,21 +51,9 @@ struct FST_UnitSaveRecord
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FName UnitRowName;
 
-    /** 오른손 슬롯 정보 (RowName, Count 등) */
+    /** 장착 슬롯 배열 (EUnitEquipSlot 인덱스 사용) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FST_ItemSlot HandRSlot;
-
-    /** 왼손 슬롯 정보 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FST_ItemSlot HandLSlot;
-
-    /** 머리 방어구 슬롯 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FST_ItemSlot HeadSlot;
-
-    /** 몸통 방어구 슬롯 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FST_ItemSlot BodySlot;
+    TArray<FST_ItemSlot> EquipSlots;
 
     /**
      * 이 유닛이 보유한 개별 인스턴스 아이템 맵.

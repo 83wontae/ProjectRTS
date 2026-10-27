@@ -229,8 +229,9 @@ FName USkillComponent::GetDefaultAttackSkillName()
 	if (!EquipComp) return NAME_None;
 
 	// 1. 메인 무기 이름 결정 (오른손 우선, 없으면 왼손)
-	FName MainWeaponName = !EquipComp->m_RightWeaponSlot.RowName.IsNone() ?
-		EquipComp->m_RightWeaponSlot.RowName : EquipComp->m_LeftWeaponSlot.RowName;
+	const FName RightWeaponName = EquipComp->GetEquipSlot(EUnitEquipSlot::HandR).RowName;
+	const FName LeftWeaponName = EquipComp->GetEquipSlot(EUnitEquipSlot::HandL).RowName;
+	FName MainWeaponName = !RightWeaponName.IsNone() ? RightWeaponName : LeftWeaponName;
 
 	// 2. [가드] 양손 모두 무기가 없는 경우
 	if (MainWeaponName.IsNone())

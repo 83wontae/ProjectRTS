@@ -39,8 +39,8 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
     ActiveInfo.GrowthData.Name = NewUnit.Name;
     ActiveInfo.GrowthData.Attributes = NewUnit.AccumulatedAttributes;
     // Use slot RowName for runtime info
-    ActiveInfo.EquipHandR = NewUnit.HandRSlot.RowName;
-    ActiveInfo.EquipHandL = NewUnit.HandLSlot.RowName;
+    ActiveInfo.EquipHandR = NewUnit.GetEquipSlot(EUnitEquipSlot::HandR).RowName;
+    ActiveInfo.EquipHandL = NewUnit.GetEquipSlot(EUnitEquipSlot::HandL).RowName;
     // CurrentHp는 로드 시 StateComponent에서 초기화될 수 있으므로 0으로 둡니다.
     ActiveInfo.CurrentHp = 0.0;
 
@@ -66,149 +66,80 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
     FST_UnitSaveRecord NewUnit;
     NewUnit.UnitRowName = UnitRowName;
     // Store as slots: populate RowName for new slot fields
-    NewUnit.HandRSlot.RowName = HandR;
-    NewUnit.HandLSlot.RowName = HandL;
+    NewUnit.GetEquipSlot(EUnitEquipSlot::HandR).RowName = HandR;
+    NewUnit.GetEquipSlot(EUnitEquipSlot::HandL).RowName = HandL;
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
 
     // If initial equipment row names provided, create item instances only for instance-type items
     static const FString ContextString(TEXT("AddUnitToRoster_Context"));
-    const auto CopyBaseItemData = [](const FST_ItemBase& Source, FST_ItemInstance& Instance, FST_ItemSlot& Slot)
+    const auto CopyBaseItemData = [](const FST_ItemBase& Source, FST_ItemInstance& Instance)
     {
         Instance.ItemData.DisplayName = Source.DisplayName;
         Instance.ItemData.ItemType = Source.ItemType;
         Instance.ItemData.IconSprite = Source.IconSprite;
         Instance.ItemData.WorldMesh = Source.WorldMesh;
         Instance.ItemData.MaxStackCount = Source.MaxStackCount;
-        Instance.ItemData.bIsInstance = Source.bIsInstance;
-        Slot.ItemData = Instance.ItemData;
     };
 
     if (!HandR.IsNone())
     {
-        bool bShouldCreateInstance = false;
+        FGuid InstId = FGuid::NewGuid();
+        NewUnit.GetEquipSlot(EUnitEquipSlot::HandR).RowName = HandR;
+        NewUnit.GetEquipSlot(EUnitEquipSlot::HandR).InstanceId = InstId;
 
-        // Check weapon table
+        FST_ItemInstance Inst;
+        Inst.InstanceId = InstId;
+        Inst.RowName = HandR;
+
         if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
         {
-            const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandR, ContextString);
-            if (FoundW)
+            if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandR, ContextString))
             {
-                // Use explicit bIsInstance or MaxStackCount heuristic
-                if (FoundW->bIsInstance || FoundW->MaxStackCount <= 1)
-                {
-                    bShouldCreateInstance = true;
-                }
+                CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst);
             }
         }
-
-        // Check armor table
-        if (!bShouldCreateInstance)
+        if (Inst.ItemData.ItemType == EItemType::None)
         {
             if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
             {
-                const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandR, ContextString);
-                if (FoundA)
+                if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandR, ContextString))
                 {
-                    if (FoundA->bIsInstance || FoundA->MaxStackCount <= 1)
-                    {
-                        bShouldCreateInstance = true;
-                    }
+                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst);
                 }
             }
         }
-
-        // Fallback: if an ItemData table exists on owner components (Inventory), we could check MaxStackCount
-        if (!bShouldCreateInstance)
-        {
-            // no global item table in settings; assume non-instance by default
-            bShouldCreateInstance = false;
-        }
-
-        if (bShouldCreateInstance)
-        {
-            FGuid InstId = FGuid::NewGuid();
-            NewUnit.HandRSlot.InstanceId = InstId;
-            FST_ItemInstance Inst;
-            Inst.InstanceId = InstId;
-            Inst.RowName = HandR;
-
-            if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
-            {
-                if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandR, ContextString))
-                {
-                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst, NewUnit.HandRSlot);
-                }
-            }
-            if (Inst.ItemData.ItemType == EItemType::None)
-            {
-                if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
-                {
-                    if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandR, ContextString))
-                    {
-                        CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst, NewUnit.HandRSlot);
-                    }
-                }
-            }
-            NewUnit.ItemInstances.Add(InstId, Inst);
-        }
-        else
-        {
-            // store as simple RowName (no InstanceId)
-            NewUnit.HandRSlot.RowName = HandR;
-        }
+        NewUnit.ItemInstances.Add(InstId, Inst);
     }
 
     if (!HandL.IsNone())
     {
-        bool bShouldCreateInstance = false;
+        FGuid InstId = FGuid::NewGuid();
+        NewUnit.GetEquipSlot(EUnitEquipSlot::HandL).RowName = HandL;
+        NewUnit.GetEquipSlot(EUnitEquipSlot::HandL).InstanceId = InstId;
+
+        FST_ItemInstance Inst;
+        Inst.InstanceId = InstId;
+        Inst.RowName = HandL;
 
         if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
         {
-            const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandL, ContextString);
-            if (FoundW) { if (FoundW->bIsInstance || FoundW->MaxStackCount <= 1) bShouldCreateInstance = true; }
+            if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandL, ContextString))
+            {
+                CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst);
+            }
         }
-
-        if (!bShouldCreateInstance)
+        if (Inst.ItemData.ItemType == EItemType::None)
         {
             if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
             {
-                const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandL, ContextString);
-                if (FoundA) { if (FoundA->bIsInstance || FoundA->MaxStackCount <= 1) bShouldCreateInstance = true; }
-            }
-        }
-
-        if (bShouldCreateInstance)
-        {
-            FGuid InstId = FGuid::NewGuid();
-            NewUnit.HandLSlot.InstanceId = InstId;
-            FST_ItemInstance Inst;
-            Inst.InstanceId = InstId;
-            Inst.RowName = HandL;
-
-            if (UDataTable* WT = RtsSettings::GetWeaponTable(GetOwner()))
-            {
-                if (const FST_Weapon* FoundW = WT->FindRow<FST_Weapon>(HandL, ContextString))
+                if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandL, ContextString))
                 {
-                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundW), Inst, NewUnit.HandLSlot);
+                    CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst);
                 }
             }
-            if (Inst.ItemData.ItemType == EItemType::None)
-            {
-                if (UDataTable* AT = RtsSettings::GetArmorTable(GetOwner()))
-                {
-                    if (const FST_Armor* FoundA = AT->FindRow<FST_Armor>(HandL, ContextString))
-                    {
-                        CopyBaseItemData(static_cast<const FST_ItemBase&>(*FoundA), Inst, NewUnit.HandLSlot);
-                    }
-                }
-            }
-            NewUnit.ItemInstances.Add(InstId, Inst);
         }
-        else
-        {
-            NewUnit.HandLSlot.RowName = HandL;
-        }
+        NewUnit.ItemInstances.Add(InstId, Inst);
     }
 
     SavedUnitRoster.Add(NewUnit);
