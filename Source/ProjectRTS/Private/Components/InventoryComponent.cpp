@@ -2,6 +2,8 @@
 
 
 #include "Components/InventoryComponent.h"
+#include "Global/RtsGameSettings.h"
+#include "Global/RTSItemDefinition.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -149,11 +151,16 @@ void UInventoryComponent::AddItem(FName RowName)
 		{
 			FGuid InstanceId = FGuid::NewGuid();
 			Slots[EmptySlotIndex].InstanceId = InstanceId;
+			Slots[EmptySlotIndex].Quantity = 1;
 
 			FST_ItemInstance NewInstance;
 			NewInstance.InstanceId = InstanceId;
-			NewInstance.RowName = RowName;
-			NewInstance.ItemType = FoundItem->ItemType;
+			NewInstance.ItemId = RowName;
+			if (URTSItemDefinitionBase* Definition = RtsSettings::GetItemDefinition(GetOwner(), RowName))
+			{
+				NewInstance.ItemAssetId = Definition->GetPrimaryAssetId();
+				Slots[EmptySlotIndex].ItemAssetId = NewInstance.ItemAssetId;
+			}
 			NewInstance.Quantity = 1;
 			ItemInstances.Add(InstanceId, NewInstance);
 

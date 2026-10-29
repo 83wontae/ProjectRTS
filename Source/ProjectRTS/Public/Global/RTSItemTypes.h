@@ -115,14 +115,6 @@ struct FST_ItemInstance
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FName ItemId;
 
-    // 레거시 데이터테이블 행 (즉시 전환 이후 미사용)
-    UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use ItemId or ItemAssetId"), EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
-    FName RowName;
-
-    // 레거시 테이블 라우팅 타입 (즉시 전환 이후 미사용)
-    UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use item definition type from DataAsset"), EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
-    EItemType ItemType = EItemType::None;
-
     // 인스턴스가 보유한 수량
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     int32 Quantity = 1;

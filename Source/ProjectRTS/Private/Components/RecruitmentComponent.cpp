@@ -37,7 +37,7 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
         if (!Slot.InstanceId.IsValid()) return NAME_None;
         if (const FST_ItemInstance* Inst = Unit.ItemInstances.Find(Slot.InstanceId))
         {
-            return Inst->RowName;
+            return Inst->ItemId;
         }
         return NAME_None;
     };
@@ -80,15 +80,6 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
 
-    const auto ResolveItemType = [this](FName ItemRowName) -> EItemType
-    {
-        if (URTSItemDefinitionBase* Definition = RtsSettings::GetItemDefinition(GetOwner(), ItemRowName))
-        {
-            return Definition->ItemType;
-        }
-        return EItemType::None;
-    };
-
     const auto ResolveItemAssetId = [this](FName ItemRowName) -> FPrimaryAssetId
     {
         if (URTSItemDefinitionBase* Definition = RtsSettings::GetItemDefinition(GetOwner(), ItemRowName))
@@ -107,8 +98,6 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
         Inst.InstanceId = InstId;
         Inst.ItemId = HandR;
         Inst.ItemAssetId = ResolveItemAssetId(HandR);
-        Inst.RowName = HandR;
-        Inst.ItemType = ResolveItemType(HandR);
 
         NewUnit.ItemInstances.Add(InstId, Inst);
     }
@@ -122,8 +111,6 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FNam
         Inst.InstanceId = InstId;
         Inst.ItemId = HandL;
         Inst.ItemAssetId = ResolveItemAssetId(HandL);
-        Inst.RowName = HandL;
-        Inst.ItemType = ResolveItemType(HandL);
 
         NewUnit.ItemInstances.Add(InstId, Inst);
     }

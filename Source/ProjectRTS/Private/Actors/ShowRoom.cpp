@@ -268,7 +268,7 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 				ItemInstance = *FoundInstance;
 			}
 
-			if (ItemInstance.RowName.IsNone())
+			if (ItemInstance.ItemId.IsNone())
 			{
 				EquipComp->ClearEquipSlot(SlotType);
 				continue;

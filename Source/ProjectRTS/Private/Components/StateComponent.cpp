@@ -310,7 +310,7 @@ void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
                 ItemInstance = *FoundInstance;
             }
 
-            if (ItemInstance.RowName.IsNone())
+            if (ItemInstance.ItemId.IsNone())
             {
                 EquipComp->ClearEquipSlot(SlotType);
                 continue;

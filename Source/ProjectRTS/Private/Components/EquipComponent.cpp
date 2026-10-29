@@ -60,7 +60,7 @@ FName UEquipComponent::ResolveRowNameFromSlot(EUnitEquipSlot SlotType) const
 	{
 		if (Instance.InstanceId == Slot.InstanceId)
 		{
-			return Instance.RowName;
+			return Instance.ItemId;
 		}
 	}
 	return NAME_None;
@@ -91,6 +91,8 @@ void UEquipComponent::ApplySlotItem(EUnitEquipSlot SlotType, const FST_ItemInsta
 {
 	FST_ItemSlot& Slot = GetEquipSlot(SlotType);
 	Slot.InstanceId = ItemInstance.InstanceId;
+	Slot.ItemAssetId = ItemInstance.ItemAssetId;
+	Slot.Quantity = ItemInstance.Quantity;
 
 	for (FST_ItemInstance& Existing : m_EquippedItemInstances)
 	{
@@ -106,37 +108,31 @@ void UEquipComponent::ApplySlotItem(EUnitEquipSlot SlotType, const FST_ItemInsta
 
 bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemInstance, EUnitEquipSlot SlotType) const
 {
-	if (ItemInstance.RowName.IsNone())
+	if (ItemInstance.ItemId.IsNone())
 	{
 		return false;
 	}
 
 	if (SlotType == EUnitEquipSlot::HandR || SlotType == EUnitEquipSlot::HandL)
 	{
-		if (ItemInstance.ItemType != EItemType::Weapon)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: slot %d expects Weapon type."), (int32)SlotType);
-			return false;
-		}
-
 		UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-		const FST_Weapon* WeaponData = WeaponTable ? WeaponTable->FindRow<FST_Weapon>(ItemInstance.RowName, TEXT("ValidateItemInstanceForSlot")) : nullptr;
+		const FST_Weapon* WeaponData = WeaponTable ? WeaponTable->FindRow<FST_Weapon>(ItemInstance.ItemId, TEXT("ValidateItemInstanceForSlot")) : nullptr;
 		if (!WeaponData)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid weapon row for slot %d."), *ItemInstance.RowName.ToString(), (int32)SlotType);
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid weapon row for slot %d."), *ItemInstance.ItemId.ToString(), (int32)SlotType);
 			return false;
 		}
 
 		if (SlotType == EUnitEquipSlot::HandR &&
 			(WeaponData->HandConstraint == EWeaponHandConstraint::ForceLeft || WeaponData->HandConstraint == EWeaponHandConstraint::Shield))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to right hand."), *ItemInstance.RowName.ToString());
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to right hand."), *ItemInstance.ItemId.ToString());
 			return false;
 		}
 
 		if (SlotType == EUnitEquipSlot::HandL && WeaponData->HandConstraint == EWeaponHandConstraint::ForceRight)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to left hand."), *ItemInstance.RowName.ToString());
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to left hand."), *ItemInstance.ItemId.ToString());
 			return false;
 		}
 
@@ -145,17 +141,11 @@ bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemIn
 
 	if (SlotType == EUnitEquipSlot::Head || SlotType == EUnitEquipSlot::Body || SlotType == EUnitEquipSlot::Horse)
 	{
-		if (ItemInstance.ItemType != EItemType::Armor)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: slot %d expects Armor type."), (int32)SlotType);
-			return false;
-		}
-
 		UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
-		const FST_Armor* ArmorData = ArmorTable ? ArmorTable->FindRow<FST_Armor>(ItemInstance.RowName, TEXT("ValidateItemInstanceForSlot")) : nullptr;
+		const FST_Armor* ArmorData = ArmorTable ? ArmorTable->FindRow<FST_Armor>(ItemInstance.ItemId, TEXT("ValidateItemInstanceForSlot")) : nullptr;
 		if (!ArmorData)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid armor row for slot %d."), *ItemInstance.RowName.ToString(), (int32)SlotType);
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid armor row for slot %d."), *ItemInstance.ItemId.ToString(), (int32)SlotType);
 			return false;
 		}
 
@@ -166,7 +156,7 @@ bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemIn
 
 		if (ArmorData->EquipType != ExpectedType)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' equip type mismatch. slot=%d, itemType=%d"), *ItemInstance.RowName.ToString(), (int32)SlotType, (int32)ArmorData->EquipType);
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' equip type mismatch. slot=%d, itemType=%d"), *ItemInstance.ItemId.ToString(), (int32)SlotType, (int32)ArmorData->EquipType);
 			return false;
 		}
 
@@ -215,6 +205,8 @@ void UEquipComponent::ClearEquipSlot(EUnitEquipSlot SlotType)
 	FST_ItemSlot& Slot = GetEquipSlot(SlotType);
 	const FGuid PreviousInstanceId = Slot.InstanceId;
 	Slot.InstanceId.Invalidate();
+	Slot.ItemAssetId = FPrimaryAssetId();
+	Slot.Quantity = 0;
 
 	if (PreviousInstanceId.IsValid())
 	{
@@ -337,7 +329,7 @@ void UEquipComponent::EquipItemInstance(const FST_ItemInstance& ItemInstance, EU
 {
 	if (GetOwnerRole() != ROLE_Authority) return;
 
-	if (ItemInstance.RowName.IsNone() || !ItemInstance.InstanceId.IsValid())
+	if (ItemInstance.ItemId.IsNone() || !ItemInstance.InstanceId.IsValid())
 	{
 		ClearEquipSlot(SlotType);
 		return;
@@ -356,12 +348,12 @@ void UEquipComponent::EquipItemInstance(const FST_ItemInstance& ItemInstance, EU
 
 void UEquipComponent::EquipToWeaponInstance(const FST_ItemInstance& ItemInstance)
 {
-	if (GetOwnerRole() != ROLE_Authority || ItemInstance.RowName.IsNone()) return;
+	if (GetOwnerRole() != ROLE_Authority || ItemInstance.ItemId.IsNone()) return;
 
 	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
 	if (!WeaponTable) return;
 
-	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(ItemInstance.RowName, TEXT("EquipToWeaponInstance"));
+	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(ItemInstance.ItemId, TEXT("EquipToWeaponInstance"));
 	if (!WeaponData) return;
 
 	EWeaponSlot TargetSlot = EWeaponSlot::RightHand;
@@ -390,8 +382,7 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
-	ItemInstance.RowName = WeaponName;
-	ItemInstance.ItemType = EItemType::Weapon;
+	ItemInstance.ItemId = WeaponName;
 	EquipItemInstance(ItemInstance, GetSlotTypeFromWeaponSlot(Slot));
 }
 
@@ -407,8 +398,7 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
-	ItemInstance.RowName = ArmorName;
-	ItemInstance.ItemType = EItemType::Armor;
+	ItemInstance.ItemId = ArmorName;
 	EquipItemInstance(ItemInstance, GetSlotTypeFromEquipType(Type));
 }
 
@@ -850,8 +840,7 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
-	ItemInstance.RowName = WeaponName;
-	ItemInstance.ItemType = EItemType::Weapon;
+	ItemInstance.ItemId = WeaponName;
 	EquipToWeaponInstance(ItemInstance);
 }
 
