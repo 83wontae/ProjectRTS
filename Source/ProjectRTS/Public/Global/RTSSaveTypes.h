@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Global/RTSUnitTypes.h" // FST_Attributes를 사용하기 위해 포함
-#include "Global/RTSItemTypes.h" // ItemInstance / ItemSlot 정의
+#include "Global/RTSItemTypes.h" // ItemInstance / ItemSlot / InventorySlot 정의
 #include "RTSSaveTypes.generated.h"
 
 /** * 개별 인재(유닛)의 저장 데이터
@@ -51,9 +51,13 @@ struct FST_UnitSaveRecord
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FName UnitRowName;
 
-    /** 장착 슬롯 배열 (EUnitEquipSlot 인덱스 사용) */
+    /** 장착 슬롯 배열 (EUnitEquipSlot 인덱스 사용, PrimaryAssetId 기반) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     TArray<FST_ItemSlot> EquipSlots;
+
+    /** 인벤토리 슬롯 배열 (PrimaryAssetId 기반) */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TArray<FST_InventorySlot> InventorySlots;
 
     /**
      * 이 유닛이 보유한 개별 인스턴스 아이템 맵.

@@ -38,6 +38,39 @@ const FST_ItemSlot& UEquipComponent::GetEquipSlot(EUnitEquipSlot SlotType) const
 	return m_EquipSlots.IsValidIndex(Index) ? m_EquipSlots[Index] : EmptySlot;
 }
 
+bool UEquipComponent::TryGetEquippedItemInstance(const FGuid& InstanceId, FST_ItemInstance& OutInstance) const
+{
+	if (!InstanceId.IsValid()) return false;
+	for (const FST_ItemInstance& Instance : m_EquippedItemInstances)
+	{
+		if (Instance.InstanceId == InstanceId)
+		{
+			OutInstance = Instance;
+			return true;
+		}
+	}
+	return false;
+}
+
+FName UEquipComponent::ResolveRowNameFromSlot(EUnitEquipSlot SlotType) const
+{
+	const FST_ItemSlot& Slot = GetEquipSlot(SlotType);
+	if (!Slot.InstanceId.IsValid()) return NAME_None;
+	for (const FST_ItemInstance& Instance : m_EquippedItemInstances)
+	{
+		if (Instance.InstanceId == Slot.InstanceId)
+		{
+			return Instance.RowName;
+		}
+	}
+	return NAME_None;
+}
+
+FName UEquipComponent::GetEquipSlotRowName(EUnitEquipSlot SlotType) const
+{
+	return ResolveRowNameFromSlot(SlotType);
+}
+
 EUnitEquipSlot UEquipComponent::GetSlotTypeFromWeaponSlot(EWeaponSlot Slot) const
 {
 	return (Slot == EWeaponSlot::RightHand) ? EUnitEquipSlot::HandR : EUnitEquipSlot::HandL;
@@ -57,14 +90,122 @@ EUnitEquipSlot UEquipComponent::GetSlotTypeFromEquipType(EEquipType Type) const
 void UEquipComponent::ApplySlotItem(EUnitEquipSlot SlotType, const FST_ItemInstance& ItemInstance)
 {
 	FST_ItemSlot& Slot = GetEquipSlot(SlotType);
-	Slot.RowName = ItemInstance.RowName;
 	Slot.InstanceId = ItemInstance.InstanceId;
+
+	for (FST_ItemInstance& Existing : m_EquippedItemInstances)
+	{
+		if (Existing.InstanceId == ItemInstance.InstanceId)
+		{
+			Existing = ItemInstance;
+			return;
+		}
+	}
+
+	m_EquippedItemInstances.Add(ItemInstance);
+}
+
+bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemInstance, EUnitEquipSlot SlotType) const
+{
+	if (ItemInstance.RowName.IsNone())
+	{
+		return false;
+	}
+
+	if (SlotType == EUnitEquipSlot::HandR || SlotType == EUnitEquipSlot::HandL)
+	{
+		if (ItemInstance.ItemType != EItemType::Weapon)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: slot %d expects Weapon type."), (int32)SlotType);
+			return false;
+		}
+
+		UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
+		const FST_Weapon* WeaponData = WeaponTable ? WeaponTable->FindRow<FST_Weapon>(ItemInstance.RowName, TEXT("ValidateItemInstanceForSlot")) : nullptr;
+		if (!WeaponData)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid weapon row for slot %d."), *ItemInstance.RowName.ToString(), (int32)SlotType);
+			return false;
+		}
+
+		if (SlotType == EUnitEquipSlot::HandR &&
+			(WeaponData->HandConstraint == EWeaponHandConstraint::ForceLeft || WeaponData->HandConstraint == EWeaponHandConstraint::Shield))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to right hand."), *ItemInstance.RowName.ToString());
+			return false;
+		}
+
+		if (SlotType == EUnitEquipSlot::HandL && WeaponData->HandConstraint == EWeaponHandConstraint::ForceRight)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to left hand."), *ItemInstance.RowName.ToString());
+			return false;
+		}
+
+		return true;
+	}
+
+	if (SlotType == EUnitEquipSlot::Head || SlotType == EUnitEquipSlot::Body || SlotType == EUnitEquipSlot::Horse)
+	{
+		if (ItemInstance.ItemType != EItemType::Armor)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: slot %d expects Armor type."), (int32)SlotType);
+			return false;
+		}
+
+		UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
+		const FST_Armor* ArmorData = ArmorTable ? ArmorTable->FindRow<FST_Armor>(ItemInstance.RowName, TEXT("ValidateItemInstanceForSlot")) : nullptr;
+		if (!ArmorData)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid armor row for slot %d."), *ItemInstance.RowName.ToString(), (int32)SlotType);
+			return false;
+		}
+
+		const EEquipType ExpectedType =
+			(SlotType == EUnitEquipSlot::Head) ? EEquipType::Head :
+			(SlotType == EUnitEquipSlot::Body) ? EEquipType::Body :
+			EEquipType::Horse;
+
+		if (ArmorData->EquipType != ExpectedType)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' equip type mismatch. slot=%d, itemType=%d"), *ItemInstance.RowName.ToString(), (int32)SlotType, (int32)ArmorData->EquipType);
+			return false;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+void UEquipComponent::NotifySlotUpdated(EUnitEquipSlot SlotType)
+{
+	switch (SlotType)
+	{
+	case EUnitEquipSlot::HandR:
+		OnRep_RightWeaponName();
+		UpdateBattleAnimType();
+		break;
+	case EUnitEquipSlot::HandL:
+		OnRep_LeftWeaponName();
+		UpdateBattleAnimType();
+		break;
+	case EUnitEquipSlot::Head:
+		OnRep_ArmorHeadName();
+		break;
+	case EUnitEquipSlot::Body:
+		OnRep_ArmorBodyName();
+		break;
+	case EUnitEquipSlot::Horse:
+		OnRep_ArmorHorseName();
+		break;
+	default:
+		break;
+	}
 }
 
 bool UEquipComponent::IsEquipSlotEmpty(EUnitEquipSlot SlotType) const
 {
 	const FST_ItemSlot& Slot = GetEquipSlot(SlotType);
-	return Slot.RowName.IsNone() && !Slot.InstanceId.IsValid();
+	return !Slot.InstanceId.IsValid();
 }
 
 void UEquipComponent::ClearEquipSlot(EUnitEquipSlot SlotType)
@@ -72,8 +213,30 @@ void UEquipComponent::ClearEquipSlot(EUnitEquipSlot SlotType)
 	if (GetOwnerRole() != ROLE_Authority) return;
 
 	FST_ItemSlot& Slot = GetEquipSlot(SlotType);
-	Slot.RowName = NAME_None;
+	const FGuid PreviousInstanceId = Slot.InstanceId;
 	Slot.InstanceId.Invalidate();
+
+	if (PreviousInstanceId.IsValid())
+	{
+		bool bIsStillReferenced = false;
+		for (int32 Index = 0; Index < m_EquipSlots.Num(); ++Index)
+		{
+			if (Index == static_cast<int32>(SlotType)) continue;
+			if (m_EquipSlots[Index].InstanceId == PreviousInstanceId)
+			{
+				bIsStillReferenced = true;
+				break;
+			}
+		}
+
+		if (!bIsStillReferenced)
+		{
+			m_EquippedItemInstances.RemoveAll([&PreviousInstanceId](const FST_ItemInstance& Instance)
+			{
+				return Instance.InstanceId == PreviousInstanceId;
+			});
+		}
+	}
 
 	switch (SlotType)
 	{
@@ -106,6 +269,7 @@ void UEquipComponent::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerChar = Cast<ACharacter>(GetOwner());
+	m_LastReplicatedEquipSlots = m_EquipSlots;
 
 	RefreshWeaponsInEditor();
 }
@@ -164,8 +328,8 @@ void UEquipComponent::RefreshWeaponsInEditor()
 {
 	// 기존에 만든 장착 로직을 재사용합니다.
 	// HandleWeaponAttachment 내부에서 이미 Destroy() 로직이 있으므로 안전합니다.
-	HandleWeaponAttachment(GetEquipSlot(EUnitEquipSlot::HandR).RowName, EWeaponSlot::RightHand);
-	HandleWeaponAttachment(GetEquipSlot(EUnitEquipSlot::HandL).RowName, EWeaponSlot::LeftHand);
+	HandleWeaponAttachment(GetEquipSlotRowName(EUnitEquipSlot::HandR), EWeaponSlot::RightHand);
+	HandleWeaponAttachment(GetEquipSlotRowName(EUnitEquipSlot::HandL), EWeaponSlot::LeftHand);
 	UpdateBattleAnimType();
 }
 
@@ -179,29 +343,13 @@ void UEquipComponent::EquipItemInstance(const FST_ItemInstance& ItemInstance, EU
 		return;
 	}
 
-	ApplySlotItem(SlotType, ItemInstance);
-
-	switch (SlotType)
+	if (!ValidateItemInstanceForSlot(ItemInstance, SlotType))
 	{
-	case EUnitEquipSlot::HandR:
-		OnRep_RightWeaponName();
-		UpdateBattleAnimType();
-		break;
-	case EUnitEquipSlot::HandL:
-		OnRep_LeftWeaponName();
-		UpdateBattleAnimType();
-		break;
-	case EUnitEquipSlot::Head:
-		OnRep_ArmorHeadName();
-		break;
-	case EUnitEquipSlot::Body:
-		OnRep_ArmorBodyName();
-		break;
-	case EUnitEquipSlot::Horse:
-		OnRep_ArmorHorseName();
-		break;
-	default: break;
+		return;
 	}
+
+	ApplySlotItem(SlotType, ItemInstance);
+	NotifySlotUpdated(SlotType);
 
 	UpdateTotalEquipStats();
 }
@@ -243,6 +391,7 @@ void UEquipComponent::EquipWeaponByName(FName WeaponName, EWeaponSlot Slot)
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
 	ItemInstance.RowName = WeaponName;
+	ItemInstance.ItemType = EItemType::Weapon;
 	EquipItemInstance(ItemInstance, GetSlotTypeFromWeaponSlot(Slot));
 }
 
@@ -259,6 +408,7 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
 	ItemInstance.RowName = ArmorName;
+	ItemInstance.ItemType = EItemType::Armor;
 	EquipItemInstance(ItemInstance, GetSlotTypeFromEquipType(Type));
 }
 
@@ -272,7 +422,7 @@ void UEquipComponent::EquipToUnitData(FName InUnitRowName)
 
 bool UEquipComponent::IsRideState() const
 {
-	return !GetEquipSlot(EUnitEquipSlot::Horse).RowName.IsNone();
+	return !GetEquipSlotRowName(EUnitEquipSlot::Horse).IsNone();
 }
 
 void UEquipComponent::UpdateTotalEquipStats()
@@ -287,16 +437,18 @@ void UEquipComponent::UpdateTotalEquipStats()
 	FST_CombatStats NewEquipCombat;
 
 	// 오른손 무기 공격력 합산
-	if (WeaponTable && !GetEquipSlot(EUnitEquipSlot::HandR).RowName.IsNone())
+	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
+	if (WeaponTable && !RightRowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandR).RowName, TEXT("")))
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(RightRowName, TEXT("")))
 			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
 	// 왼손 무기 공격력 합산
-	if (WeaponTable && !GetEquipSlot(EUnitEquipSlot::HandL).RowName.IsNone())
+	const FName LeftRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
+	if (WeaponTable && !LeftRowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandL).RowName, TEXT("")))
+		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(LeftRowName, TEXT("")))
 			NewEquipCombat.Attack += Data->AttackPower;
 	}
 
@@ -307,11 +459,26 @@ void UEquipComponent::UpdateTotalEquipStats()
 
 void UEquipComponent::OnRep_EquipSlots()
 {
-	OnRep_RightWeaponName();
-	OnRep_LeftWeaponName();
-	OnRep_ArmorHeadName();
-	OnRep_ArmorBodyName();
-	OnRep_ArmorHorseName();
+	const int32 MaxSlotCount = static_cast<int32>(EUnitEquipSlot::Max);
+	for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
+	{
+		const bool bHasCurrent = m_EquipSlots.IsValidIndex(SlotIndex);
+		const bool bHasPrevious = m_LastReplicatedEquipSlots.IsValidIndex(SlotIndex);
+		FST_ItemSlot CurrentSlot;
+		FST_ItemSlot PreviousSlot;
+		if (bHasCurrent) CurrentSlot = m_EquipSlots[SlotIndex];
+		if (bHasPrevious) PreviousSlot = m_LastReplicatedEquipSlots[SlotIndex];
+
+		const bool bChanged = (CurrentSlot.InstanceId != PreviousSlot.InstanceId);
+		if (!bChanged)
+		{
+			continue;
+		}
+
+		NotifySlotUpdated(static_cast<EUnitEquipSlot>(SlotIndex));
+	}
+
+	m_LastReplicatedEquipSlots = m_EquipSlots;
 }
 
 // --- OnRep  --- 
@@ -340,9 +507,10 @@ void UEquipComponent::OnRep_RightWeaponName()
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
-	HandleWeaponAttachment(GetEquipSlot(EUnitEquipSlot::HandR).RowName, EWeaponSlot::RightHand);
+	const FName WeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
+	HandleWeaponAttachment(WeaponRowName, EWeaponSlot::RightHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandR).RowName, TEXT(""));
+	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
 	if (Data)
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for right weapon updates.
@@ -360,9 +528,10 @@ void UEquipComponent::OnRep_LeftWeaponName()
 	if (!WeaponTable) return;
 
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
-	HandleWeaponAttachment(GetEquipSlot(EUnitEquipSlot::HandL).RowName, EWeaponSlot::LeftHand);
+	const FName WeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
+	HandleWeaponAttachment(WeaponRowName, EWeaponSlot::LeftHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandL).RowName, TEXT(""));
+	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
 	if (Data)
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for left weapon updates.
@@ -379,7 +548,8 @@ void UEquipComponent::OnRep_ArmorHeadName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(GetEquipSlot(EUnitEquipSlot::Head).RowName, TEXT(""));
+	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Head);
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
 	if (Data)
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for head armor updates.
@@ -397,7 +567,8 @@ void UEquipComponent::OnRep_ArmorBodyName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(GetEquipSlot(EUnitEquipSlot::Body).RowName, TEXT(""));
+	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Body);
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
 	if (Data)
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for body armor updates.
@@ -415,7 +586,8 @@ void UEquipComponent::OnRep_ArmorHorseName()
 
 	if (!ArmorTable) return;
 
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(GetEquipSlot(EUnitEquipSlot::Horse).RowName, TEXT(""));
+	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Horse);
+	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
 	if (Data)
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for horse armor updates.
@@ -446,8 +618,8 @@ void UEquipComponent::UpdateBattleAnimType()
 	EBattleAnimType NewType = EBattleAnimType::None;
 
 	// 2. 무기 데이터 조회 (Null 체크 포함)
-	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandR).RowName, TEXT(""));
-	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandL).RowName, TEXT(""));
+	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlotRowName(EUnitEquipSlot::HandR), TEXT(""));
+	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlotRowName(EUnitEquipSlot::HandL), TEXT(""));
 
 	// 3. 애니메이션 타입 결정 (우선순위 로직)
 	if (LeftData && LeftData->WeaponType == EWeaponType::Bow)
@@ -679,6 +851,7 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 	FST_ItemInstance ItemInstance;
 	ItemInstance.InstanceId = FGuid::NewGuid();
 	ItemInstance.RowName = WeaponName;
+	ItemInstance.ItemType = EItemType::Weapon;
 	EquipToWeaponInstance(ItemInstance);
 }
 
@@ -691,16 +864,18 @@ float UEquipComponent::GetAttackRange() const
 	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
 	// 1. 우선순위: 오른손 무기 데이터 확인
-	if (!GetEquipSlot(EUnitEquipSlot::HandR).RowName.IsNone())
+	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
+	if (!RightRowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandR).RowName, TEXT("GetRange"));
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(RightRowName, TEXT("GetRange"));
 		if (WeaponData) return (float)WeaponData->AttackRange;
 	}
 
 	// 2. 차순위: 왼손 무기 데이터 확인 (활이나 양손 무기 대응)
-	if (!GetEquipSlot(EUnitEquipSlot::HandL).RowName.IsNone())
+	const FName LeftRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
+	if (!LeftRowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlot(EUnitEquipSlot::HandL).RowName, TEXT("GetRange"));
+		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(LeftRowName, TEXT("GetRange"));
 		if (WeaponData)
 		{
 			if (WeaponData->WeaponType != EWeaponType::Shield)

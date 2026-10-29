@@ -12,6 +12,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/DebugWidgetComponent.h"
 #include "Global/RtsGameSettings.h"
+#include "Global/RTSItemDefinition.h"
 
 USkillComponent::USkillComponent()
 {
@@ -222,15 +223,12 @@ FName USkillComponent::GetDefaultAttackSkillName()
 {
 	if (!OwnerChar) return NAME_None;
 
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-	if (!WeaponTable) return NAME_None;
-
 	UEquipComponent* EquipComp = OwnerChar->FindComponentByClass<UEquipComponent>();
 	if (!EquipComp) return NAME_None;
 
 	// 1. 메인 무기 이름 결정 (오른손 우선, 없으면 왼손)
-	const FName RightWeaponName = EquipComp->GetEquipSlot(EUnitEquipSlot::HandR).RowName;
-	const FName LeftWeaponName = EquipComp->GetEquipSlot(EUnitEquipSlot::HandL).RowName;
+	const FName RightWeaponName = EquipComp->GetEquipSlotRowName(EUnitEquipSlot::HandR);
+	const FName LeftWeaponName = EquipComp->GetEquipSlotRowName(EUnitEquipSlot::HandL);
 	FName MainWeaponName = !RightWeaponName.IsNone() ? RightWeaponName : LeftWeaponName;
 
 	// 2. [가드] 양손 모두 무기가 없는 경우
@@ -240,13 +238,13 @@ FName USkillComponent::GetDefaultAttackSkillName()
 		return NAME_None;
 	}
 
-	// 3. 데이터 테이블에서 스킬 이름 찾기
-	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(MainWeaponName, TEXT(""));
-	if (!WeaponData) return NAME_None;
+	URTSItemDefinitionBase* ItemDefinition = RtsSettings::GetItemDefinition(GetOwner(), MainWeaponName);
+	const URTSWeaponDefinition* WeaponDefinition = Cast<URTSWeaponDefinition>(ItemDefinition);
+	if (!WeaponDefinition) return NAME_None;
 
 	// 4. 탑승 여부에 따른 최종 스킬 반환
 	bool bIsRiding = EquipComp->IsRideState();
-	return bIsRiding ? WeaponData->SkillNameRide : WeaponData->SkillName;
+	return bIsRiding ? WeaponDefinition->SkillNameRide : WeaponDefinition->SkillName;
 }
 
 void USkillComponent::AddSkill(FName SkillName)

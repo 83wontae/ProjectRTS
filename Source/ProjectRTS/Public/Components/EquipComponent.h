@@ -84,6 +84,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	bool IsEquipSlotEmpty(EUnitEquipSlot SlotType) const;
 
+	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
+	FName GetEquipSlotRowName(EUnitEquipSlot SlotType) const;
+
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void ClearEquipSlot(EUnitEquipSlot SlotType);
 
@@ -120,6 +123,9 @@ public:
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_EquipSlots, BlueprintReadWrite, Category = "RTS|Equip")
 	TArray<FST_ItemSlot> m_EquipSlots;
 
+	UPROPERTY()
+	TArray<FST_ItemInstance> m_EquippedItemInstances;
+
 	UPROPERTY(ReplicatedUsing = OnRep_BattleAnimType, BlueprintReadWrite, Category = "RTS|Combat")
 	EBattleAnimType m_BattleAnimType;
 
@@ -153,9 +159,15 @@ private:
 	EUnitEquipSlot GetSlotTypeFromWeaponSlot(EWeaponSlot Slot) const;
 	EUnitEquipSlot GetSlotTypeFromEquipType(EEquipType Type) const;
 	void ApplySlotItem(EUnitEquipSlot SlotType, const FST_ItemInstance& ItemInstance);
+	FName ResolveRowNameFromSlot(EUnitEquipSlot SlotType) const;
+	bool ValidateItemInstanceForSlot(const FST_ItemInstance& ItemInstance, EUnitEquipSlot SlotType) const;
+	void NotifySlotUpdated(EUnitEquipSlot SlotType);
 
 	UPROPERTY()
 	class ACharacter* OwnerChar;
+
+	UPROPERTY(Transient)
+	TArray<FST_ItemSlot> m_LastReplicatedEquipSlots;
 
 	// UniqueId of the owning unit (set by RecruitmentComponent when actor registered)
 	UPROPERTY()
@@ -168,6 +180,7 @@ public:
 	int32 GetEquipSlotIndex(EUnitEquipSlot SlotType) const { return static_cast<int32>(SlotType); }
 	FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType);
 	const FST_ItemSlot& GetEquipSlot(EUnitEquipSlot SlotType) const;
+	bool TryGetEquippedItemInstance(const FGuid& InstanceId, FST_ItemInstance& OutInstance) const;
 
 protected:
 	/** 스폰할 무기 베이스 클래스 (BP_Weapon 등을 할당) */

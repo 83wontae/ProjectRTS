@@ -256,28 +256,26 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 			const EUnitEquipSlot SlotType = static_cast<EUnitEquipSlot>(SlotIndex);
 			const FST_ItemSlot& SavedSlot = FoundRecord->EquipSlots[SlotIndex];
 
-			if (SavedSlot.RowName.IsNone())
+			if (!SavedSlot.InstanceId.IsValid())
 			{
 				EquipComp->ClearEquipSlot(SlotType);
 				continue;
 			}
 
 			FST_ItemInstance ItemInstance;
-			if (SavedSlot.InstanceId.IsValid())
+			if (const FST_ItemInstance* FoundInstance = FoundRecord->ItemInstances.Find(SavedSlot.InstanceId))
 			{
-				if (const FST_ItemInstance* FoundInstance = FoundRecord->ItemInstances.Find(SavedSlot.InstanceId))
-				{
-					ItemInstance = *FoundInstance;
-				}
+				ItemInstance = *FoundInstance;
 			}
 
 			if (ItemInstance.RowName.IsNone())
 			{
-				ItemInstance.RowName = SavedSlot.RowName;
+				EquipComp->ClearEquipSlot(SlotType);
+				continue;
 			}
 			if (!ItemInstance.InstanceId.IsValid())
 			{
-				ItemInstance.InstanceId = SavedSlot.InstanceId.IsValid() ? SavedSlot.InstanceId : FGuid::NewGuid();
+				ItemInstance.InstanceId = SavedSlot.InstanceId;
 			}
 
 			EquipComp->EquipItemInstance(ItemInstance, SlotType);

@@ -48,7 +48,6 @@ void UInventoryComponent::SetEmptySlot(int32 Index)
 		ItemInstances.Remove(Slots[Index].InstanceId);
 	}
 
-	Slots[Index].RowName = NAME_None;
 	Slots[Index].InstanceId.Invalidate();
 
 	// 5. Call Event Dispatcher ChangeInven
@@ -63,7 +62,7 @@ bool UInventoryComponent::IsEmptySlot(int32 Index) const
 		return false;
 	}
 
-	return Slots[Index].RowName.IsNone();
+	return !Slots[Index].InstanceId.IsValid();
 }
 
 void UInventoryComponent::RemoveItem(int32 Index)
@@ -103,7 +102,6 @@ void UInventoryComponent::CreateInvenSlots(int32 Count)
 
 	// 2. 빈 슬롯 템플릿 생성
 	FST_ItemSlot NewEmptySlot;
-	NewEmptySlot.RowName = NAME_None;
 	NewEmptySlot.InstanceId.Invalidate();
 
 	// 메모리 재할당 방지를 위한 공간 미리 확보
@@ -150,14 +148,13 @@ void UInventoryComponent::AddItem(FName RowName)
 		if (Slots.IsValidIndex(EmptySlotIndex))
 		{
 			FGuid InstanceId = FGuid::NewGuid();
-			Slots[EmptySlotIndex].RowName = RowName;
 			Slots[EmptySlotIndex].InstanceId = InstanceId;
 
 			FST_ItemInstance NewInstance;
 			NewInstance.InstanceId = InstanceId;
 			NewInstance.RowName = RowName;
+			NewInstance.ItemType = FoundItem->ItemType;
 			NewInstance.Quantity = 1;
-			NewInstance.ItemData = *FoundItem;
 			ItemInstances.Add(InstanceId, NewInstance);
 
 			// 6. Call Event Dispatcher (ChangeInven 이벤트 브로드캐스트)

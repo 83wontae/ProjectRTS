@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "Engine/AssetManagerTypes.h"
 #include "Global/RTSCoreTypes.h" // 기초 타입 활용을 위해 포함
 #include "Misc/Guid.h"
 #include "RTSItemTypes.generated.h"
@@ -63,12 +64,33 @@ struct FST_ItemSlot : public FTableRowBase
 {
     GENERATED_BODY()
 
-    // RowName을 보관하면 슬롯이 어떤 데이터 테이블 행을 참조하는지 명확해집니다.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
-    FName RowName;
+    FPrimaryAssetId ItemAssetId;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    int32 Quantity = 0;
 
     // 슬롯이 참조하는 인스턴스 ID
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemSlot")
+    FGuid InstanceId;
+};
+
+// PrimaryDataAsset 기반 인벤토리 슬롯 구조체
+USTRUCT(BlueprintType)
+struct FST_InventorySlot
+{
+    GENERATED_BODY()
+
+    // 아이템 정의 에셋 식별자
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
+    FPrimaryAssetId ItemAssetId;
+
+    // 슬롯 수량
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
+    int32 Quantity = 0;
+
+    // 인스턴스 상태(내구도/강화)가 필요할 경우 사용
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
     FGuid InstanceId;
 };
 
@@ -85,18 +107,25 @@ struct FST_ItemInstance
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FGuid InstanceId;
 
-    // 참조하는 데이터테이블 행
+    // PrimaryDataAsset 식별자
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    FPrimaryAssetId ItemAssetId;
+
+    // 아이템 논리 식별자
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    FName ItemId;
+
+    // 레거시 데이터테이블 행 (즉시 전환 이후 미사용)
+    UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use ItemId or ItemAssetId"), EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     FName RowName;
+
+    // 레거시 테이블 라우팅 타입 (즉시 전환 이후 미사용)
+    UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use item definition type from DataAsset"), EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
+    EItemType ItemType = EItemType::None;
 
     // 인스턴스가 보유한 수량
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
     int32 Quantity = 1;
-
-    // 레거시 호환 필드 (정적 정의 복사본)
-    // 인스턴스가 참조하는 기본 아이템 정보
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")
-    FST_ItemBase ItemData;
 
     // 내구도 (필요하지 않으면 -1)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ItemInstance")

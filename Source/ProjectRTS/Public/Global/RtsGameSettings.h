@@ -7,7 +7,10 @@
 #include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
 #include "Global/RtsGameInstance.h"
+#include "Global/RTSItemTypes.h"
 #include "RtsGameSettings.generated.h"
+
+class URTSItemDefinitionBase;
 
 /**
  * */
@@ -88,6 +91,15 @@ namespace RtsSettings
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
 			return Instance->GetSkillDataTable();
+		}
+		return nullptr;
+	}
+
+	FORCEINLINE URTSItemDefinitionBase* GetItemDefinition(const UObject* WorldContextObject, FName ItemId)
+	{
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->GetItemDefinitionById(ItemId);
 		}
 		return nullptr;
 	}

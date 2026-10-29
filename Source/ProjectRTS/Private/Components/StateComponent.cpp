@@ -242,46 +242,29 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
         SaveData.GetEquipSlot(EUnitEquipSlot::Body) = EquipComp->GetEquipSlot(EUnitEquipSlot::Body);
         SaveData.GetEquipSlot(EUnitEquipSlot::Horse) = EquipComp->GetEquipSlot(EUnitEquipSlot::Horse);
 
-        // If any slot references an InstanceId, ensure the instance entry is included
-        const FST_ItemSlot& HandRSlot = SaveData.GetEquipSlot(EUnitEquipSlot::HandR);
-        const FST_ItemSlot& HandLSlot = SaveData.GetEquipSlot(EUnitEquipSlot::HandL);
-        const FST_ItemSlot& HeadSlot = SaveData.GetEquipSlot(EUnitEquipSlot::Head);
-        const FST_ItemSlot& BodySlot = SaveData.GetEquipSlot(EUnitEquipSlot::Body);
+        // If any slot references an InstanceId, include the full instance entry from source-of-truth map
+        const int32 MaxSlotCount = static_cast<int32>(EUnitEquipSlot::Max);
+        for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
+        {
+            const EUnitEquipSlot SlotType = static_cast<EUnitEquipSlot>(SlotIndex);
+            const FST_ItemSlot& Slot = SaveData.GetEquipSlot(SlotType);
+            if (!Slot.InstanceId.IsValid())
+            {
+                continue;
+            }
 
-        if (HandRSlot.InstanceId.IsValid())
-        {
             FST_ItemInstance Inst;
-            Inst.InstanceId = HandRSlot.InstanceId;
-            Inst.RowName = HandRSlot.RowName;
-            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
-        }
-        if (HandLSlot.InstanceId.IsValid())
-        {
-            FST_ItemInstance Inst;
-            Inst.InstanceId = HandLSlot.InstanceId;
-            Inst.RowName = HandLSlot.RowName;
-            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
-        }
-        if (HeadSlot.InstanceId.IsValid())
-        {
-            FST_ItemInstance Inst;
-            Inst.InstanceId = HeadSlot.InstanceId;
-            Inst.RowName = HeadSlot.RowName;
-            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
-        }
-        if (BodySlot.InstanceId.IsValid())
-        {
-            FST_ItemInstance Inst;
-            Inst.InstanceId = BodySlot.InstanceId;
-            Inst.RowName = BodySlot.RowName;
-            SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+            if (EquipComp->TryGetEquippedItemInstance(Slot.InstanceId, Inst))
+            {
+                SaveData.ItemInstances.Add(Inst.InstanceId, Inst);
+            }
         }
 
         // Confirm saved armor slots for debugging
         if (GEngine && GetOwner())
         {
-            FString HeadName = HeadSlot.RowName.IsNone() ? TEXT("None") : HeadSlot.RowName.ToString();
-            FString BodyName = BodySlot.RowName.IsNone() ? TEXT("None") : BodySlot.RowName.ToString();
+            FString HeadName = EquipComp->GetEquipSlotRowName(EUnitEquipSlot::Head).IsNone() ? TEXT("None") : EquipComp->GetEquipSlotRowName(EUnitEquipSlot::Head).ToString();
+            FString BodyName = EquipComp->GetEquipSlotRowName(EUnitEquipSlot::Body).IsNone() ? TEXT("None") : EquipComp->GetEquipSlotRowName(EUnitEquipSlot::Body).ToString();
             UE_LOG(LogTemp, Log, TEXT("[%s] GetFullSaveData: HeadSlot='%s' BodySlot='%s'"), *GetOwner()->GetName(), *HeadName, *BodyName);
         }
     }
@@ -315,28 +298,26 @@ void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
             const EUnitEquipSlot SlotType = static_cast<EUnitEquipSlot>(SlotIndex);
             const FST_ItemSlot& SavedSlot = InData.EquipSlots[SlotIndex];
 
-            if (SavedSlot.RowName.IsNone())
+            if (!SavedSlot.InstanceId.IsValid())
             {
                 EquipComp->ClearEquipSlot(SlotType);
                 continue;
             }
 
             FST_ItemInstance ItemInstance;
-            if (SavedSlot.InstanceId.IsValid())
+            if (const FST_ItemInstance* FoundInstance = InData.ItemInstances.Find(SavedSlot.InstanceId))
             {
-                if (const FST_ItemInstance* FoundInstance = InData.ItemInstances.Find(SavedSlot.InstanceId))
-                {
-                    ItemInstance = *FoundInstance;
-                }
+                ItemInstance = *FoundInstance;
             }
 
             if (ItemInstance.RowName.IsNone())
             {
-                ItemInstance.RowName = SavedSlot.RowName;
+                EquipComp->ClearEquipSlot(SlotType);
+                continue;
             }
             if (!ItemInstance.InstanceId.IsValid())
             {
-                ItemInstance.InstanceId = SavedSlot.InstanceId.IsValid() ? SavedSlot.InstanceId : FGuid::NewGuid();
+                ItemInstance.InstanceId = SavedSlot.InstanceId;
             }
 
             EquipComp->EquipItemInstance(ItemInstance, SlotType);
