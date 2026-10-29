@@ -15,4 +15,7 @@ class PROJECTRTS_API URtsSettingsBlueprintLibrary : public UBlueprintFunctionLib
 public:
 	UFUNCTION(BlueprintPure, Category = "RTS|Settings", meta = (WorldContext = "WorldContextObject"))
 	static URTSItemDefinitionBase* GetItemDefinition(const UObject* WorldContextObject, FName ItemId);
+
+	UFUNCTION(BlueprintCallable, Category = "RTS|Settings", meta = (WorldContext = "WorldContextObject"))
+	static bool TryGetItemDefinition(const UObject* WorldContextObject, FName ItemId, URTSItemDefinitionBase*& OutItemDefinition);
 };

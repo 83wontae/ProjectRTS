@@ -103,4 +103,15 @@ namespace RtsSettings
 		}
 		return nullptr;
 	}
+
+	FORCEINLINE bool TryGetItemDefinition(const UObject* WorldContextObject, FName ItemId, URTSItemDefinitionBase*& OutItemDefinition)
+	{
+		OutItemDefinition = nullptr;
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->TryGetItemDefinitionById(ItemId, OutItemDefinition);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("TryGetItemDefinition failed: RtsGameInstance is null. ItemId='%s'"), *ItemId.ToString());
+		return false;
+	}
 }

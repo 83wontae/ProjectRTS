@@ -5,3 +5,8 @@ URTSItemDefinitionBase* URtsSettingsBlueprintLibrary::GetItemDefinition(const UO
 {
 	return RtsSettings::GetItemDefinition(WorldContextObject, ItemId);
 }
+
+bool URtsSettingsBlueprintLibrary::TryGetItemDefinition(const UObject* WorldContextObject, FName ItemId, URTSItemDefinitionBase*& OutItemDefinition)
+{
+	return RtsSettings::TryGetItemDefinition(WorldContextObject, ItemId, OutItemDefinition);
+}

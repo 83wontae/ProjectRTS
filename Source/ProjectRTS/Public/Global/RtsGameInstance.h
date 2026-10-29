@@ -23,6 +23,7 @@ public:
 	UDataTable* GetArmorDataTable();
 	UDataTable* GetJobDataTable();
 	UDataTable* GetSkillDataTable();
+	bool TryGetItemDefinitionById(FName ItemId, URTSItemDefinitionBase*& OutItemDefinition);
 	URTSItemDefinitionBase* GetItemDefinitionById(FName ItemId);
 
 private:

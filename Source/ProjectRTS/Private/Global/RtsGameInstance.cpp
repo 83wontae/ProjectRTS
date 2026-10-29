@@ -112,17 +112,32 @@ void URtsGameInstance::BuildItemDefinitionCacheIfNeeded()
 
 URTSItemDefinitionBase* URtsGameInstance::GetItemDefinitionById(FName ItemId)
 {
+	URTSItemDefinitionBase* ItemDefinition = nullptr;
+	if (TryGetItemDefinitionById(ItemId, ItemDefinition))
+	{
+		return ItemDefinition;
+	}
+	return nullptr;
+}
+
+bool URtsGameInstance::TryGetItemDefinitionById(FName ItemId, URTSItemDefinitionBase*& OutItemDefinition)
+{
+	OutItemDefinition = nullptr;
+
 	if (ItemId.IsNone())
 	{
-		return nullptr;
+		UE_LOG(LogTemp, Warning, TEXT("TryGetItemDefinitionById failed: ItemId is None."));
+		return false;
 	}
 
 	BuildItemDefinitionCacheIfNeeded();
 
 	if (TObjectPtr<URTSItemDefinitionBase>* Found = CachedItemDefinitionsById.Find(ItemId))
 	{
-		return Found->Get();
+		OutItemDefinition = Found->Get();
+		return true;
 	}
 
-	return nullptr;
+	UE_LOG(LogTemp, Warning, TEXT("TryGetItemDefinitionById failed: ItemId '%s' was not found."), *ItemId.ToString());
+	return false;
 }
