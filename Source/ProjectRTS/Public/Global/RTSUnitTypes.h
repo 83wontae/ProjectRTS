@@ -92,7 +92,7 @@ struct FST_Unit : public FTableRowBase
 {
     GENERATED_BODY()
 
-    FST_Unit() : Name(TEXT("New Unit")), UnitJobRowName("Novice"), AttackRange(200.0), DetectionRange(1500.0f) {}
+    FST_Unit() : Name(TEXT("New Unit")), UnitJobRowName("Novice") {}
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
     FString Name;
@@ -108,12 +108,6 @@ struct FST_Unit : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Parts")
     class USkeletalMesh* BodyPart;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
-    double AttackRange;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Combat")
-    float DetectionRange;
 };
 
 /** * 유닛의 실시간 성장 데이터
@@ -140,9 +134,9 @@ struct FST_RuntimeUnitInfo
 {
     GENERATED_BODY()
 
-    // 1. 고유 식별 및 참조 (메시나 텍스처를 직접 들고 있지 않고 행 이름만 기억합니다)
+    // 1. 고유 식별 및 참조 (UnitDefinition PrimaryAssetId 기반)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Identity")
-    FName UnitRowName;
+    FPrimaryAssetId UnitDefinitionId;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit|Identity")
     FName CurrentJobRowName;

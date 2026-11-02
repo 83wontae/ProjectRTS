@@ -8,6 +8,7 @@
 #include "EngineUtils.h"
 #include "Global/RtsGameSettings.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSUnitDefinition.h"
 #include "Kismet/KismetMathLibrary.h"
 
 URecruitmentComponent::URecruitmentComponent()
@@ -18,7 +19,7 @@ URecruitmentComponent::URecruitmentComponent()
 
 void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& SaveData)
 {
-    if (SaveData.UnitRowName.IsNone()) return;
+    if (!SaveData.UnitDefinitionId.IsValid()) return;
 
     FST_UnitSaveRecord NewUnit = SaveData;
     // 만약 세이브에 UniqueId가 비어있다면 새로 생성
@@ -44,7 +45,7 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
 
     // ActiveUnits 맵에도 동기화
     FST_RuntimeUnitInfo ActiveInfo;
-    ActiveInfo.UnitRowName = NewUnit.UnitRowName;
+    ActiveInfo.UnitDefinitionId = NewUnit.UnitDefinitionId;
     ActiveInfo.CurrentJobRowName = NewUnit.CurrentJob;
     ActiveInfo.GrowthData.Level = NewUnit.Level;
     ActiveInfo.GrowthData.CurrentExp = NewUnit.CurrentExp;
@@ -70,15 +71,17 @@ void URecruitmentComponent::AddUnitToRosterFromSave(const FST_UnitSaveRecord& Sa
     }
 }
 
-void URecruitmentComponent::AddUnitToRoster(FName UnitRowName, FName HandR, FName HandL)
+void URecruitmentComponent::AddUnitToRoster(FName UnitAssetName, FName HandR, FName HandL)
 {
-    if (UnitRowName.IsNone()) return;
+    const FPrimaryAssetId UnitDefinitionId(URTSUnitDefinition::AssetType, UnitAssetName);
+    if (!UnitDefinitionId.IsValid()) return;
 
     // 1. 초기화된 통합 구조체 생성
     FST_UnitSaveRecord NewUnit;
-    NewUnit.UnitRowName = UnitRowName;
+    NewUnit.UnitDefinitionId = UnitDefinitionId;
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
+    NewUnit.Name = UnitAssetName.ToString();
 
     const auto ResolveItemAssetId = [this](FName ItemRowName) -> FPrimaryAssetId
     {
@@ -141,8 +144,8 @@ void URecruitmentComponent::RegisterActorForUniqueId(const FGuid& Id, AActor* Ac
     UniqueIdToActor.Add(Id, Actor);
     ActorToUniqueId.Add(Actor, Id);
 
-    // bind to actor destroyed to cleanup mappings
-    Actor->OnDestroyed.AddDynamic(this, &URecruitmentComponent::HandleActorDestroyed);
+    // bind to actor destroyed to cleanup mappings (중복 바인딩 방지)
+    Actor->OnDestroyed.AddUniqueDynamic(this, &URecruitmentComponent::HandleActorDestroyed);
 
     // If actor has an EquipComponent, bind to its update delegates for real-time sync
     if (Actor)
@@ -152,9 +155,9 @@ void URecruitmentComponent::RegisterActorForUniqueId(const FGuid& Id, AActor* Ac
         {
             // set UniqueId on EquipComponent so it can broadcast directly
             EquipComp->SetOwnerUniqueId(Id);
-            // Bind to the UniqueId-aware delegates
-            EquipComp->OnUpdateWeaponWithId.AddDynamic(this, &URecruitmentComponent::OnAnyEquipWeaponUpdated);
-            EquipComp->OnUpdateArmorWithId.AddDynamic(this, &URecruitmentComponent::OnAnyEquipArmorUpdated);
+            // Bind to the UniqueId-aware delegates (중복 바인딩 방지)
+            EquipComp->OnUpdateWeaponWithId.AddUniqueDynamic(this, &URecruitmentComponent::OnAnyEquipWeaponUpdated);
+            EquipComp->OnUpdateArmorWithId.AddUniqueDynamic(this, &URecruitmentComponent::OnAnyEquipArmorUpdated);
         }
     }
 }
@@ -212,8 +215,14 @@ void URecruitmentComponent::HandleActorDestroyed(AActor* DestroyedActor)
 
 void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadius)
 {
-    UDataTable* UnitDataTable = RtsSettings::GetUnitTable(GetOwner());
-    if (!UnitDataTable) return;
+    UE_LOG(LogTemp, Log, TEXT("[Recruitment] SpawnRecruitedUnits start: StartTag=%s, SpawnRadius=%.2f, RosterCount=%d"),
+        *StartTag.ToString(), SpawnRadius, SavedUnitRoster.Num());
+
+    if (!GetWorld())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Recruitment] SpawnRecruitedUnits aborted: World is null."));
+        return;
+    }
 
     // 2. PlayerStart 찾기
     APlayerStart* TargetStart = nullptr;
@@ -221,16 +230,33 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
     {
         if (It->PlayerStartTag == StartTag) { TargetStart = *It; break; }
     }
-    if (!TargetStart) return;
+    if (!TargetStart)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Recruitment] SpawnRecruitedUnits aborted: PlayerStart not found for tag '%s'"), *StartTag.ToString());
+        return;
+    }
 
     FVector CenterLocation = TargetStart->GetActorLocation();
+    UE_LOG(LogTemp, Log, TEXT("[Recruitment] Spawn center: %s"), *CenterLocation.ToString());
 
     // 3. 리스트의 모든 유닛 순회하며 스폰
     for (const FST_UnitSaveRecord& RecruitData : SavedUnitRoster)
     {
-		FST_Unit* UnitInfo = UnitDataTable->FindRow<FST_Unit>(RecruitData.UnitRowName, TEXT("SpawnRecruitedUnits"));
+        URTSUnitDefinition* UnitDefinition = nullptr;
+        FST_Unit UnitInfo;
+        if (!RtsSettings::TryGetUnitDefinition(GetOwner(), RecruitData.UnitDefinitionId, UnitDefinition) || !ToUnitLegacyData(UnitDefinition, UnitInfo))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Recruitment] Skip unit: UnitDefinition resolve failed. UnitDefinitionId=%s, UniqueId=%s"),
+                *RecruitData.UnitDefinitionId.ToString(), *RecruitData.UniqueId.ToString());
+            continue;
+        }
         // 유효성 및 클래스 설정 확인
-        if (!UnitInfo || !UnitInfo->UnitClass) continue;
+        if (!UnitInfo.UnitClass)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Recruitment] Skip unit: UnitClass is null. UnitDefinitionId=%s, UniqueId=%s"),
+                *RecruitData.UnitDefinitionId.ToString(), *RecruitData.UniqueId.ToString());
+            continue;
+        }
 
         // 4. 위치 계산
         FVector2D RandomCircle = FMath::RandPointInCircle(SpawnRadius);
@@ -241,7 +267,7 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
 
         // 5. [수정 포인트] 데이터 테이블에 정의된 클래스로 스폰을 실행합니다.
         ARtsUnitCharacter* SpawnedUnit = GetWorld()->SpawnActor<ARtsUnitCharacter>(
-            UnitInfo->UnitClass,
+            UnitInfo.UnitClass,
             SpawnLocation,
             TargetStart->GetActorRotation(),
             SpawnParams
@@ -249,11 +275,15 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
 
         if (SpawnedUnit)
         {
+            UE_LOG(LogTemp, Log, TEXT("[Recruitment] Spawn success: UnitDefinitionId=%s, UniqueId=%s, SpawnedActor=%s, Location=%s"),
+                *RecruitData.UnitDefinitionId.ToString(), *RecruitData.UniqueId.ToString(), *SpawnedUnit->GetName(), *SpawnLocation.ToString());
+
             SpawnedUnit->SpawnDefaultController(); // AI 빙의
 
             // 6. 먼저 UniqueId를 세팅하고 매핑을 등록하여 EquipComponent가
             //    LoadFromFullSaveData 시점에 UniqueId-aware 브로드캐스트를 받을 수 있게 합니다.
             SpawnedUnit->UniqueId = RecruitData.UniqueId;
+            SpawnedUnit->SetUnitDefinitionId(RecruitData.UnitDefinitionId);
             RegisterActorForUniqueId(RecruitData.UniqueId, SpawnedUnit);
 
             // 상태 및 장비 복구 (통합 데이터 주입)
@@ -262,5 +292,12 @@ void URecruitmentComponent::SpawnRecruitedUnits(FName StartTag, float SpawnRadiu
                 SpawnedUnit->StateComp->LoadFromFullSaveData(RecruitData);
             }
         }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Recruitment] Spawn failed: UnitDefinitionId=%s, UniqueId=%s, Location=%s"),
+                *RecruitData.UnitDefinitionId.ToString(), *RecruitData.UniqueId.ToString(), *SpawnLocation.ToString());
+        }
     }
+
+    UE_LOG(LogTemp, Log, TEXT("[Recruitment] SpawnRecruitedUnits end"));
 }

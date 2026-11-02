@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/PrimaryAssetId.h"
 #include "GameFramework/Actor.h"
 #include "Interface/EquipableInterface.h"
 #include "Global/ProjectRTSTypes.h"
@@ -58,7 +59,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Showroom|Lighting")
 	USpotLightComponent* FillLight;
 
-	FName GetUnitRowName() const { return UnitRowName; }
+	FPrimaryAssetId GetUnitDefinitionId() const { return UnitDefinitionId; }
 
 	/** UI 드래그 시 캐릭터 메시만 회전 */
 	UFUNCTION(BlueprintCallable, Category = "Showroom|Control")
@@ -81,7 +82,7 @@ public:
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data", meta = (ExposeOnSpawn = "true"))
-	FName UnitRowName;
+	FPrimaryAssetId UnitDefinitionId;
 
 	// Currently displayed UniqueId
 	FGuid m_CurrentUniqueId;

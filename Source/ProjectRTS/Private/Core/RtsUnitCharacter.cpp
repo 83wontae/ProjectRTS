@@ -5,6 +5,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/DecalComponent.h"
 #include "Global/RtsGameSettings.h"
+#include "Global/RTSUnitDefinition.h"
 // ensure we can find the player controller and recruitment component when auto-registering
 #include "Kismet/GameplayStatics.h"
 #include "Components/RecruitmentComponent.h"
@@ -91,19 +92,16 @@ void ARtsUnitCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 
     FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-	if (!UnitTable) return;
-
-    // UnitRowName이 바뀌었을 때 실시간 업데이트
-    if (PropertyName == GET_MEMBER_NAME_CHECKED(ARtsUnitCharacter, UnitRowName))
+    // UnitDefinitionId가 바뀌었을 때 실시간 업데이트
+    if (PropertyName == GET_MEMBER_NAME_CHECKED(ARtsUnitCharacter, UnitDefinitionId))
     {
-        if (EquipComp && !UnitRowName.IsNone())
+        if (EquipComp && UnitDefinitionId.IsValid())
         {
-            // GetUnitData 함수가 EquipComp에 구현되어 있어야 합니다.
-			const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT(""));
-            if (UnitData)
+            URTSUnitDefinition* UnitDefinition = nullptr;
+            FST_Unit UnitData;
+            if (RtsSettings::TryGetUnitDefinition(GetOwner(), UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
             {
-                HandleUnitBodyUpdate(*UnitData);
+                HandleUnitBodyUpdate(UnitData);
             }
         }
     }
@@ -114,9 +112,6 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
 
-    UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-	if (!UnitTable) return;
-
     // 1. 메시 포즈 동기화
     if (GetMesh())
     {
@@ -125,10 +120,14 @@ void ARtsUnitCharacter::OnConstruction(const FTransform& Transform)
     }
 
     // 2. 유닛 바디 업데이트
-    if (EquipComp && !UnitRowName.IsNone())
+    if (EquipComp && UnitDefinitionId.IsValid())
     {
-        const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT(""));
-        if (UnitData) HandleUnitBodyUpdate(*UnitData);
+        URTSUnitDefinition* UnitDefinition = nullptr;
+        FST_Unit UnitData;
+        if (RtsSettings::TryGetUnitDefinition(GetOwner(), UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
+        {
+            HandleUnitBodyUpdate(UnitData);
+        }
     }
 
     // 3. [추가] 무기 업데이트 (에디터 뷰포트용)
@@ -146,9 +145,9 @@ USkeletalMeshComponent* ARtsUnitCharacter::GetTargetAttachMesh_Implementation() 
 void ARtsUnitCharacter::InitializeUnit()
 {
     // 캐릭터는 '어떤 유닛인지' 식별자만 컴포넌트에 넘깁니다.
-    if (EquipComp && !UnitRowName.IsNone())
+    if (EquipComp && UnitDefinitionId.IsValid())
     {
-        EquipComp->EquipToUnitData(UnitRowName);
+        EquipComp->EquipToUnitData(UnitDefinitionId);
     }
 }
 

@@ -10,6 +10,7 @@
 #include "Components/PostProcessComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/RecruitmentComponent.h"
+#include "Global/RTSUnitDefinition.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Guid.h"
 
@@ -229,15 +230,15 @@ void AShowRoom::UpdateUnitByUniqueId(const FGuid& UniqueId)
 	if (!FoundRecord) return;
 
 	// Apply base unit body
-	UnitRowName = FoundRecord->UnitRowName;
+	UnitDefinitionId = FoundRecord->UnitDefinitionId;
 	m_CurrentUniqueId = UniqueId;
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(this);
-	if (UnitTable && !UnitRowName.IsNone())
+	if (UnitDefinitionId.IsValid())
 	{
-		const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT("ShowRoom_UpdateUnitById"));
-		if (UnitData)
+		URTSUnitDefinition* UnitDefinition = nullptr;
+		FST_Unit UnitData;
+		if (RtsSettings::TryGetUnitDefinition(this, UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
 		{
-			HandleUnitBodyUpdate(*UnitData);
+			HandleUnitBodyUpdate(UnitData);
 		}
 	}
 
@@ -298,15 +299,15 @@ void AShowRoom::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEve
 
 	FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(AShowRoom, UnitRowName))
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(AShowRoom, UnitDefinitionId))
 	{
-		UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-		if (UnitTable && !UnitRowName.IsNone())
+		if (UnitDefinitionId.IsValid())
 		{
-			const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT("ShowRoom_EditorUpdate"));
-			if (UnitData)
+			URTSUnitDefinition* UnitDefinition = nullptr;
+			FST_Unit UnitData;
+			if (RtsSettings::TryGetUnitDefinition(GetOwner(), UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
 			{
-				HandleUnitBodyUpdate(*UnitData);
+				HandleUnitBodyUpdate(UnitData);
 			}
 		}
 	}
@@ -317,21 +318,19 @@ void AShowRoom::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-	if (!UnitTable) return;
-
 	if (BodyMesh)
 	{
 		if (HeadMesh) HeadMesh->SetLeaderPoseComponent(BodyMesh);
 		if (HorseMesh) HorseMesh->SetLeaderPoseComponent(BodyMesh);
 	}
 
-	if (!UnitRowName.IsNone())
+	if (UnitDefinitionId.IsValid())
 	{
-		const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(UnitRowName, TEXT("ShowRoom_OnConstruction"));
-		if (UnitData)
+		URTSUnitDefinition* UnitDefinition = nullptr;
+		FST_Unit UnitData;
+		if (RtsSettings::TryGetUnitDefinition(GetOwner(), UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
 		{
-			HandleUnitBodyUpdate(*UnitData);
+			HandleUnitBodyUpdate(UnitData);
 		}
 	}
 

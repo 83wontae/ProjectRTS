@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/PrimaryAssetId.h"
 #include "Components/ActorComponent.h"
 #include "Global/ProjectRTSTypes.h"
 #include "EquipComponent.generated.h"
@@ -59,9 +60,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void EquipArmorByName(FName ArmorName, EEquipType Type);
 
-	/** 유닛 데이터(구조체)를 받아 초기 외형을 설정합니다. (내부적으로 Name 방식으로 전환 가능) */
+	/** 유닛 정의 식별자를 받아 초기 외형을 설정합니다. */
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
-	void EquipToUnitData(FName InUnitRowName);
+	void EquipToUnitData(const FPrimaryAssetId& InUnitDefinitionId);
 
 	UFUNCTION(BlueprintCallable, Category = "RTS|Equip")
 	void UpdateTotalEquipStats();
@@ -100,7 +101,7 @@ public:
 	float GetDetectionRange() const;
 
 	// --- OnRep 함수 ---
-	UFUNCTION() void OnRep_UnitRowName();
+	UFUNCTION() void OnRep_UnitDefinitionId();
 	UFUNCTION() void OnRep_EquipSlots();
 	UFUNCTION() void OnRep_RightWeaponName();
 	UFUNCTION() void OnRep_LeftWeaponName();
@@ -117,8 +118,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RTS|Equip")
 	FVector GetMainMuzzleLocation() const;
 
-	UPROPERTY(ReplicatedUsing = OnRep_UnitRowName, BlueprintReadWrite, Category = "RTS|Equip")
-	FName m_UnitRowName;
+	UPROPERTY(ReplicatedUsing = OnRep_UnitDefinitionId, BlueprintReadWrite, Category = "RTS|Equip")
+	FPrimaryAssetId m_UnitDefinitionId;
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_EquipSlots, BlueprintReadWrite, Category = "RTS|Equip")
 	TArray<FST_ItemSlot> m_EquipSlots;

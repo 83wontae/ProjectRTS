@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "UObject/PrimaryAssetId.h"
 #include "Global/RTSUnitTypes.h" // FST_Attributes를 사용하기 위해 포함
 #include "Global/RTSItemTypes.h" // ItemInstance / ItemSlot / InventorySlot 정의
 #include "RTSSaveTypes.generated.h"
@@ -49,7 +50,7 @@ struct FST_UnitSaveRecord
 
     // 1. 기초 고용 정보
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FName UnitRowName;
+    FPrimaryAssetId UnitDefinitionId;
 
     /** 장착 슬롯 배열 (EUnitEquipSlot 인덱스 사용, PrimaryAssetId 기반) */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)

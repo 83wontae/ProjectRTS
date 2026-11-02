@@ -6,18 +6,110 @@
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSUnitDefinition.h"
 
-UDataTable* URtsGameInstance::GetUnitDataTable()
+void URtsGameInstance::BuildUnitDefinitionCacheIfNeeded()
 {
-	if (CachedUnitTable) return CachedUnitTable;
-
-	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
-	// IsNull()로 경로가 설정되어 있는지 확인 후 안전하게 로드합니다.
-	if (Settings && !Settings->UnitDataTable.IsNull())
+	if (bUnitDefinitionCacheBuilt)
 	{
-		CachedUnitTable = Settings->UnitDataTable.LoadSynchronous();
+		return;
 	}
-	return CachedUnitTable;
+
+	bUnitDefinitionCacheBuilt = true;
+	CachedUnitDefinitionsById.Reset();
+	CachedUnitDefinitionsByAssetId.Reset();
+
+	UAssetManager& AssetManager = UAssetManager::Get();
+	TArray<FPrimaryAssetId> AssetIds;
+	AssetManager.GetPrimaryAssetIdList(URTSUnitDefinition::AssetType, AssetIds);
+
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		const FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
+		UObject* LoadedObject = AssetPath.IsValid() ? AssetPath.TryLoad() : nullptr;
+		URTSUnitDefinition* Definition = Cast<URTSUnitDefinition>(LoadedObject);
+		if (!Definition)
+		{
+			continue;
+		}
+
+		CachedUnitDefinitionsByAssetId.Add(AssetId, Definition);
+
+		if (!Definition->UnitId.IsNone())
+		{
+			CachedUnitDefinitionsById.Add(Definition->UnitId, Definition);
+		}
+
+		if (!AssetId.PrimaryAssetName.IsNone())
+		{
+			CachedUnitDefinitionsById.Add(AssetId.PrimaryAssetName, Definition);
+		}
+	}
+
+}
+
+URTSUnitDefinition* URtsGameInstance::GetUnitDefinitionByAssetId(const FPrimaryAssetId& UnitDefinitionId)
+{
+	URTSUnitDefinition* UnitDefinition = nullptr;
+	if (TryGetUnitDefinitionByAssetId(UnitDefinitionId, UnitDefinition))
+	{
+		return UnitDefinition;
+	}
+	return nullptr;
+}
+
+bool URtsGameInstance::TryGetUnitDefinitionByAssetId(const FPrimaryAssetId& UnitDefinitionId, URTSUnitDefinition*& OutUnitDefinition)
+{
+	OutUnitDefinition = nullptr;
+
+	if (!UnitDefinitionId.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TryGetUnitDefinitionByAssetId failed: UnitDefinitionId is invalid."));
+		return false;
+	}
+
+	BuildUnitDefinitionCacheIfNeeded();
+
+	if (TObjectPtr<URTSUnitDefinition>* Found = CachedUnitDefinitionsByAssetId.Find(UnitDefinitionId))
+	{
+		OutUnitDefinition = Found->Get();
+		return true;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("TryGetUnitDefinitionByAssetId failed: UnitDefinitionId '%s' was not found."), *UnitDefinitionId.ToString());
+	return false;
+}
+
+URTSUnitDefinition* URtsGameInstance::GetUnitDefinitionById(FName UnitId)
+{
+	URTSUnitDefinition* UnitDefinition = nullptr;
+	if (TryGetUnitDefinitionById(UnitId, UnitDefinition))
+	{
+		return UnitDefinition;
+	}
+	return nullptr;
+}
+
+bool URtsGameInstance::TryGetUnitDefinitionById(FName UnitId, URTSUnitDefinition*& OutUnitDefinition)
+{
+	OutUnitDefinition = nullptr;
+
+	if (UnitId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TryGetUnitDefinitionById failed: UnitId is None."));
+		return false;
+	}
+
+	BuildUnitDefinitionCacheIfNeeded();
+
+	if (TObjectPtr<URTSUnitDefinition>* Found = CachedUnitDefinitionsById.Find(UnitId))
+	{
+		OutUnitDefinition = Found->Get();
+		return true;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("TryGetUnitDefinitionById failed: UnitId '%s' was not found."), *UnitId.ToString());
+	return false;
 }
 
 UDataTable* URtsGameInstance::GetWeaponDataTable()

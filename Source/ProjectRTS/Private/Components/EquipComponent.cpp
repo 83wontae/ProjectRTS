@@ -9,12 +9,18 @@
 #include "Interface/WeaponInterface.h"
 #include "Global/RtsGameSettings.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSUnitDefinition.h"
 #include "Interface/EquipableInterface.h"	
 
 namespace
 {
 	bool TryResolveWeaponData(const UObject* WorldContextObject, FName ItemId, FST_Weapon& OutWeapon)
 	{
+		if (ItemId.IsNone())
+		{
+			return false;
+		}
+
 		URTSItemDefinitionBase* BaseDefinition = nullptr;
 		if (!RtsSettings::TryGetItemDefinition(WorldContextObject, ItemId, BaseDefinition))
 		{
@@ -47,6 +53,11 @@ namespace
 
 	bool TryResolveArmorData(const UObject* WorldContextObject, FName ItemId, FST_Armor& OutArmor)
 	{
+		if (ItemId.IsNone())
+		{
+			return false;
+		}
+
 		URTSItemDefinitionBase* BaseDefinition = nullptr;
 		if (!RtsSettings::TryGetItemDefinition(WorldContextObject, ItemId, BaseDefinition))
 		{
@@ -460,12 +471,12 @@ void UEquipComponent::EquipArmorByName(FName ArmorName, EEquipType Type)
 	EquipItemInstance(ItemInstance, GetSlotTypeFromEquipType(Type));
 }
 
-void UEquipComponent::EquipToUnitData(FName InUnitRowName)
+void UEquipComponent::EquipToUnitData(const FPrimaryAssetId& InUnitDefinitionId)
 {
 	if (GetOwnerRole() != ROLE_Authority) return;
 
-	m_UnitRowName = InUnitRowName;
-	OnRep_UnitRowName(); // 서버에서도 비주얼 업데이트 실행
+	m_UnitDefinitionId = InUnitDefinitionId;
+	OnRep_UnitDefinitionId(); // 서버에서도 비주얼 업데이트 실행
 }
 
 bool UEquipComponent::IsRideState() const
@@ -533,20 +544,19 @@ void UEquipComponent::OnRep_EquipSlots()
 }
 
 // --- OnRep  --- 
-void UEquipComponent::OnRep_UnitRowName()
+void UEquipComponent::OnRep_UnitDefinitionId()
 {
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
+	if (!m_UnitDefinitionId.IsValid()) return;
 
-	if (!UnitTable || m_UnitRowName.IsNone()) return;
-
-	const FST_Unit* Data = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
-	if (Data)
+	URTSUnitDefinition* UnitDefinition = nullptr;
+	FST_Unit UnitData;
+	if (RtsSettings::TryGetUnitDefinition(GetOwner(), m_UnitDefinitionId, UnitDefinition) && ToUnitLegacyData(UnitDefinition, UnitData))
 	{
 		// 모든 스탯 계산은 이 함수가 책임집니다.
 		UpdateTotalEquipStats();
 
 		// 비주얼(메쉬) 업데이트만 수행
-		OnUpdateUnitBody.Broadcast(*Data);
+		OnUpdateUnitBody.Broadcast(UnitData);
 	}
 }
 
@@ -643,8 +653,10 @@ void UEquipComponent::UpdateBattleAnimType()
 	// 2. 무기 데이터 조회 (Null 체크 포함)
 	FST_Weapon RightWeaponData;
 	FST_Weapon LeftWeaponData;
-	const bool bHasRightData = TryResolveWeaponData(GetOwner(), GetEquipSlotRowName(EUnitEquipSlot::HandR), RightWeaponData);
-	const bool bHasLeftData = TryResolveWeaponData(GetOwner(), GetEquipSlotRowName(EUnitEquipSlot::HandL), LeftWeaponData);
+	const FName RightWeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
+	const FName LeftWeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
+	const bool bHasRightData = !RightWeaponRowName.IsNone() && TryResolveWeaponData(GetOwner(), RightWeaponRowName, RightWeaponData);
+	const bool bHasLeftData = !LeftWeaponRowName.IsNone() && TryResolveWeaponData(GetOwner(), LeftWeaponRowName, LeftWeaponData);
 
 	// 3. 애니메이션 타입 결정 (우선순위 로직)
 	if (bHasLeftData && LeftWeaponData.WeaponType == EWeaponType::Bow)
@@ -878,8 +890,7 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 float UEquipComponent::GetAttackRange() const
 {
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
+	constexpr float DefaultUnarmedAttackRange = 150.0f;
 
 	// 1. 우선순위: 오른손 무기 데이터 확인
 	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
@@ -903,35 +914,12 @@ float UEquipComponent::GetAttackRange() const
 		}
 	}
 
-	// 3. 무기가 없을 때: 유닛 기본 데이터 테이블에서 사거리 반환
-	if (!m_UnitRowName.IsNone())
-	{
-		const FST_Unit* UnitData = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
-		if (UnitData)
-		{
-			// FST_Unit 구조체에도 AttackRange 변수가 정의되어 있어야 합니다.
-			return (float)UnitData->AttackRange;
-		}
-	}
-
-	// 모든 데이터가 없을 경우 기본값 반환
-	return 0.0f;
+	// 3. 무기를 장비하지 않았을 때 기본 근접 사거리
+	return DefaultUnarmedAttackRange;
 }
 
 float UEquipComponent::GetDetectionRange() const
 {
-	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
-	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
-
-	// 유닛 데이터 테이블에서 해당 유닛의 인지 범위를 가져옵니다.
-	if (!m_UnitRowName.IsNone())
-	{
-		const FST_Unit* Data = UnitTable->FindRow<FST_Unit>(m_UnitRowName, TEXT(""));
-		if (Data)
-		{
-			return Data->DetectionRange;
-		}
-	}
-
-	return 800.0f; // 데이터가 없을 경우의 기본값
+	constexpr float DefaultDetectionRange = 1500.0f;
+	return DefaultDetectionRange;
 }

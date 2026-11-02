@@ -225,7 +225,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
     // 1. 기초 정보 및 성장 데이터 추출
     if (ARtsUnitCharacter* Owner = Cast<ARtsUnitCharacter>(GetOwner()))
     {
-        SaveData.UnitRowName = Owner->GetUnitRowName(); //
+        SaveData.UnitDefinitionId = Owner->GetUnitDefinitionId(); //
     }
 
     SaveData.Level = m_CurrentLevel; //

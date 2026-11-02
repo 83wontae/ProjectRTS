@@ -23,7 +23,7 @@ public:
 
     /** * 새로운 유닛을 고용 리스트에 추가 (초기 데이터 생성) */
     UFUNCTION(BlueprintCallable, Category = "RTS|Recruitment")
-    void AddUnitToRoster(FName UnitRowName, FName HandR, FName HandL);
+    void AddUnitToRoster(FName UnitAssetName, FName HandR, FName HandL);
 
     /** 세이브 데이터에서 직접 유닛을 복원해 목록에 추가합니다. */
     void AddUnitToRosterFromSave(const FST_UnitSaveRecord& SaveData);

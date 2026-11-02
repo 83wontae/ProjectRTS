@@ -16,11 +16,6 @@ void ARtsGameMode::BeginPlay()
     if (GameInstance)
     {
         // 이 함수 내부에서 LoadSynchronous()가 실행되며 하드디스크의 에셋이 RAM(메모리)에 올라가고 캐싱됩니다.
-        if (GameInstance->GetUnitDataTable())
-        {
-            UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Unit Data Table successfully pre-loaded into memory."));
-        }
-
         if (GameInstance->GetWeaponDataTable())
         {
             UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Weapon Data Table successfully pre-loaded into memory."));

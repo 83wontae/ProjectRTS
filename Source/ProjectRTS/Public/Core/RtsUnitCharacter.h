@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/PrimaryAssetId.h"
 #include "GameFramework/Character.h"
 #include "Interface/EquipableInterface.h"
 #include "Interface/UnitInterface.h"
@@ -53,7 +54,8 @@ public:
     /** 실제 메시 컴포넌트의 SkeletalMesh를 교체하는 시각적 실행 함수 */
     void UpdateArmorMesh(EEquipType Type, class USkeletalMesh* NewMesh);
 
-	FName GetUnitRowName() const { return UnitRowName; }
+    FPrimaryAssetId GetUnitDefinitionId() const { return UnitDefinitionId; }
+    void SetUnitDefinitionId(const FPrimaryAssetId& InUnitDefinitionId) { UnitDefinitionId = InUnitDefinitionId; }
 
 public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -78,7 +80,7 @@ public:
 
 protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RTS|Data", meta = (ExposeOnSpawn = "true"))
-    FName UnitRowName;
+    FPrimaryAssetId UnitDefinitionId;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|Selection")
     class UDecalComponent* SelectionDecal;

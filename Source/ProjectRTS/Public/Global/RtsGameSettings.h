@@ -11,6 +11,7 @@
 #include "RtsGameSettings.generated.h"
 
 class URTSItemDefinitionBase;
+class URTSUnitDefinition;
 
 /**
  * */
@@ -26,9 +27,6 @@ public:
 	virtual FName GetSectionName() const override { return TEXT("RTSGameSettings"); }
 
 	// === 이곳에 Config 데이터가 있어야 합니다 ===
-	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
-	TSoftObjectPtr<UDataTable> UnitDataTable;
-
 	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
 	TSoftObjectPtr<UDataTable> WeaponDataTable;
 
@@ -50,13 +48,24 @@ namespace RtsSettings
 		return Cast<URtsGameInstance>(UGameplayStatics::GetGameInstance(WorldContextObject));
 	}
 
-	FORCEINLINE UDataTable* GetUnitTable(const UObject* WorldContextObject)
+	FORCEINLINE URTSUnitDefinition* GetUnitDefinition(const UObject* WorldContextObject, const FPrimaryAssetId& UnitDefinitionId)
 	{
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
-			return Instance->GetUnitDataTable();
+			return Instance->GetUnitDefinitionByAssetId(UnitDefinitionId);
 		}
 		return nullptr;
+	}
+
+	FORCEINLINE bool TryGetUnitDefinition(const UObject* WorldContextObject, const FPrimaryAssetId& UnitDefinitionId, URTSUnitDefinition*& OutUnitDefinition)
+	{
+		OutUnitDefinition = nullptr;
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->TryGetUnitDefinitionByAssetId(UnitDefinitionId, OutUnitDefinition);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("TryGetUnitDefinition failed: RtsGameInstance is null. UnitDefinitionId='%s'"), *UnitDefinitionId.ToString());
+		return false;
 	}
 
 	FORCEINLINE UDataTable* GetWeaponTable(const UObject* WorldContextObject)
