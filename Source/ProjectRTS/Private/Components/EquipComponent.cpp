@@ -8,7 +8,70 @@
 #include "Components/SkillComponent.h"
 #include "Interface/WeaponInterface.h"
 #include "Global/RtsGameSettings.h"
+#include "Global/RTSItemDefinition.h"
 #include "Interface/EquipableInterface.h"	
+
+namespace
+{
+	bool TryResolveWeaponData(const UObject* WorldContextObject, FName ItemId, FST_Weapon& OutWeapon)
+	{
+		URTSItemDefinitionBase* BaseDefinition = nullptr;
+		if (!RtsSettings::TryGetItemDefinition(WorldContextObject, ItemId, BaseDefinition))
+		{
+			return false;
+		}
+
+		const URTSWeaponDefinition* WeaponDefinition = Cast<URTSWeaponDefinition>(BaseDefinition);
+		if (!WeaponDefinition)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("TryResolveWeaponData failed: ItemId '%s' is not URTSWeaponDefinition."), *ItemId.ToString());
+			return false;
+		}
+
+		OutWeapon.DisplayName = WeaponDefinition->DisplayName;
+		OutWeapon.ItemType = WeaponDefinition->ItemType;
+		OutWeapon.IconSprite = WeaponDefinition->IconSprite;
+		OutWeapon.WorldMesh = WeaponDefinition->WorldMesh;
+		OutWeapon.MaxStackCount = WeaponDefinition->MaxStackCount;
+		OutWeapon.WeaponType = WeaponDefinition->WeaponType;
+		OutWeapon.SkillName = WeaponDefinition->SkillName;
+		OutWeapon.SkillNameRide = WeaponDefinition->SkillNameRide;
+		OutWeapon.HandConstraint = WeaponDefinition->HandConstraint;
+		OutWeapon.MuzzleSocketName = WeaponDefinition->MuzzleSocketName;
+		OutWeapon.StaticMesh = WeaponDefinition->WorldMesh;
+		OutWeapon.AttackPower = WeaponDefinition->AttackPower;
+		OutWeapon.AttackRange = WeaponDefinition->AttackRange;
+		OutWeapon.Name = WeaponDefinition->DisplayName.ToString();
+		return true;
+	}
+
+	bool TryResolveArmorData(const UObject* WorldContextObject, FName ItemId, FST_Armor& OutArmor)
+	{
+		URTSItemDefinitionBase* BaseDefinition = nullptr;
+		if (!RtsSettings::TryGetItemDefinition(WorldContextObject, ItemId, BaseDefinition))
+		{
+			return false;
+		}
+
+		const URTSArmorDefinition* ArmorDefinition = Cast<URTSArmorDefinition>(BaseDefinition);
+		if (!ArmorDefinition)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("TryResolveArmorData failed: ItemId '%s' is not URTSArmorDefinition."), *ItemId.ToString());
+			return false;
+		}
+
+		OutArmor.DisplayName = ArmorDefinition->DisplayName;
+		OutArmor.ItemType = ArmorDefinition->ItemType;
+		OutArmor.IconSprite = ArmorDefinition->IconSprite;
+		OutArmor.WorldMesh = ArmorDefinition->WorldMesh;
+		OutArmor.MaxStackCount = ArmorDefinition->MaxStackCount;
+		OutArmor.EquipType = ArmorDefinition->EquipType;
+		OutArmor.UnitType = ArmorDefinition->UnitType;
+		OutArmor.SkeletalMesh = ArmorDefinition->SkeletalMesh;
+		OutArmor.Name = ArmorDefinition->DisplayName.ToString();
+		return true;
+	}
+}
 
 // Sets default values for this component's properties
 UEquipComponent::UEquipComponent() :WeaponClass(AWeapon::StaticClass())
@@ -115,22 +178,21 @@ bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemIn
 
 	if (SlotType == EUnitEquipSlot::HandR || SlotType == EUnitEquipSlot::HandL)
 	{
-		UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-		const FST_Weapon* WeaponData = WeaponTable ? WeaponTable->FindRow<FST_Weapon>(ItemInstance.ItemId, TEXT("ValidateItemInstanceForSlot")) : nullptr;
-		if (!WeaponData)
+		FST_Weapon WeaponData;
+		if (!TryResolveWeaponData(GetOwner(), ItemInstance.ItemId, WeaponData))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid weapon row for slot %d."), *ItemInstance.ItemId.ToString(), (int32)SlotType);
 			return false;
 		}
 
 		if (SlotType == EUnitEquipSlot::HandR &&
-			(WeaponData->HandConstraint == EWeaponHandConstraint::ForceLeft || WeaponData->HandConstraint == EWeaponHandConstraint::Shield))
+			(WeaponData.HandConstraint == EWeaponHandConstraint::ForceLeft || WeaponData.HandConstraint == EWeaponHandConstraint::Shield))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to right hand."), *ItemInstance.ItemId.ToString());
 			return false;
 		}
 
-		if (SlotType == EUnitEquipSlot::HandL && WeaponData->HandConstraint == EWeaponHandConstraint::ForceRight)
+		if (SlotType == EUnitEquipSlot::HandL && WeaponData.HandConstraint == EWeaponHandConstraint::ForceRight)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' cannot be equipped to left hand."), *ItemInstance.ItemId.ToString());
 			return false;
@@ -141,9 +203,8 @@ bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemIn
 
 	if (SlotType == EUnitEquipSlot::Head || SlotType == EUnitEquipSlot::Body || SlotType == EUnitEquipSlot::Horse)
 	{
-		UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
-		const FST_Armor* ArmorData = ArmorTable ? ArmorTable->FindRow<FST_Armor>(ItemInstance.ItemId, TEXT("ValidateItemInstanceForSlot")) : nullptr;
-		if (!ArmorData)
+		FST_Armor ArmorData;
+		if (!TryResolveArmorData(GetOwner(), ItemInstance.ItemId, ArmorData))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' is not a valid armor row for slot %d."), *ItemInstance.ItemId.ToString(), (int32)SlotType);
 			return false;
@@ -154,9 +215,9 @@ bool UEquipComponent::ValidateItemInstanceForSlot(const FST_ItemInstance& ItemIn
 			(SlotType == EUnitEquipSlot::Body) ? EEquipType::Body :
 			EEquipType::Horse;
 
-		if (ArmorData->EquipType != ExpectedType)
+		if (ArmorData.EquipType != ExpectedType)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' equip type mismatch. slot=%d, itemType=%d"), *ItemInstance.ItemId.ToString(), (int32)SlotType, (int32)ArmorData->EquipType);
+			UE_LOG(LogTemp, Warning, TEXT("EquipItemInstance: '%s' equip type mismatch. slot=%d, itemType=%d"), *ItemInstance.ItemId.ToString(), (int32)SlotType, (int32)ArmorData.EquipType);
 			return false;
 		}
 
@@ -350,19 +411,16 @@ void UEquipComponent::EquipToWeaponInstance(const FST_ItemInstance& ItemInstance
 {
 	if (GetOwnerRole() != ROLE_Authority || ItemInstance.ItemId.IsNone()) return;
 
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-	if (!WeaponTable) return;
-
-	const FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(ItemInstance.ItemId, TEXT("EquipToWeaponInstance"));
-	if (!WeaponData) return;
+	FST_Weapon WeaponData;
+	if (!TryResolveWeaponData(GetOwner(), ItemInstance.ItemId, WeaponData)) return;
 
 	EWeaponSlot TargetSlot = EWeaponSlot::RightHand;
-	if (WeaponData->HandConstraint == EWeaponHandConstraint::ForceLeft ||
-		WeaponData->HandConstraint == EWeaponHandConstraint::Shield)
+	if (WeaponData.HandConstraint == EWeaponHandConstraint::ForceLeft ||
+		WeaponData.HandConstraint == EWeaponHandConstraint::Shield)
 	{
 		TargetSlot = EWeaponSlot::LeftHand;
 	}
-	else if (WeaponData->HandConstraint == EWeaponHandConstraint::ForceRight)
+	else if (WeaponData.HandConstraint == EWeaponHandConstraint::ForceRight)
 	{
 		TargetSlot = EWeaponSlot::RightHand;
 	}
@@ -417,9 +475,6 @@ bool UEquipComponent::IsRideState() const
 
 void UEquipComponent::UpdateTotalEquipStats()
 {
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-	if (WeaponTable == nullptr) return; // 데이터 테이블이 없으면 기본값 반환
-
 	UStateComponent* StateComp = GetOwner()->FindComponentByClass<UStateComponent>();
 	if (!StateComp) return;
 
@@ -428,18 +483,24 @@ void UEquipComponent::UpdateTotalEquipStats()
 
 	// 오른손 무기 공격력 합산
 	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
-	if (WeaponTable && !RightRowName.IsNone())
+	if (!RightRowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(RightRowName, TEXT("")))
-			NewEquipCombat.Attack += Data->AttackPower;
+		FST_Weapon WeaponData;
+		if (TryResolveWeaponData(GetOwner(), RightRowName, WeaponData))
+		{
+			NewEquipCombat.Attack += WeaponData.AttackPower;
+		}
 	}
 
 	// 왼손 무기 공격력 합산
 	const FName LeftRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
-	if (WeaponTable && !LeftRowName.IsNone())
+	if (!LeftRowName.IsNone())
 	{
-		if (FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(LeftRowName, TEXT("")))
-			NewEquipCombat.Attack += Data->AttackPower;
+		FST_Weapon WeaponData;
+		if (TryResolveWeaponData(GetOwner(), LeftRowName, WeaponData))
+		{
+			NewEquipCombat.Attack += WeaponData.AttackPower;
+		}
 	}
 
 	// 3. 최종적으로 계산된 장비 보너스를 State에 주입
@@ -491,99 +552,74 @@ void UEquipComponent::OnRep_UnitRowName()
 
 void UEquipComponent::OnRep_RightWeaponName()
 {
-	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-
-	if (!WeaponTable) return;
-
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
 	const FName WeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
 	HandleWeaponAttachment(WeaponRowName, EWeaponSlot::RightHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
-	if (Data)
+	FST_Weapon WeaponData;
+	if (TryResolveWeaponData(GetOwner(), WeaponRowName, WeaponData))
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for right weapon updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
-		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::RightHand, *Data);
-		OnUpdateWeapon.Broadcast(EWeaponSlot::RightHand, *Data);
+		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::RightHand, WeaponData);
+		OnUpdateWeapon.Broadcast(EWeaponSlot::RightHand, WeaponData);
 	}
 }
 
 void UEquipComponent::OnRep_LeftWeaponName()
 {
-	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-
-	if (!WeaponTable) return;
-
 	// 런타임에 실제 무기 액터를 스폰하고 부착합니다.
 	const FName WeaponRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
 	HandleWeaponAttachment(WeaponRowName, EWeaponSlot::LeftHand);
 
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT(""));
-	if (Data)
+	FST_Weapon WeaponData;
+	if (TryResolveWeaponData(GetOwner(), WeaponRowName, WeaponData))
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for left weapon updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
-		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::LeftHand, *Data);
-		OnUpdateWeapon.Broadcast(EWeaponSlot::LeftHand, *Data);
+		OnUpdateWeaponWithId.Broadcast(m_OwnerUniqueId, EWeaponSlot::LeftHand, WeaponData);
+		OnUpdateWeapon.Broadcast(EWeaponSlot::LeftHand, WeaponData);
 	}
 }
 
 void UEquipComponent::OnRep_ArmorHeadName()
 {
-	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
-
-	if (!ArmorTable) return;
-
 	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Head);
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
-	if (Data)
+	FST_Armor ArmorData;
+	if (TryResolveArmorData(GetOwner(), ArmorRowName, ArmorData))
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for head armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
-		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Head, *Data);
-		OnUpdateArmor.Broadcast(EEquipType::Head, *Data);
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Head, ArmorData);
+		OnUpdateArmor.Broadcast(EEquipType::Head, ArmorData);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}
 }
 
 void UEquipComponent::OnRep_ArmorBodyName()
 {
-	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
-
-	if (!ArmorTable) return;
-
 	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Body);
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
-	if (Data)
+	FST_Armor ArmorData;
+	if (TryResolveArmorData(GetOwner(), ArmorRowName, ArmorData))
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for body armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
-		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Body, *Data);
-		OnUpdateArmor.Broadcast(EEquipType::Body, *Data);
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Body, ArmorData);
+		OnUpdateArmor.Broadcast(EEquipType::Body, ArmorData);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}
 }
 
 void UEquipComponent::OnRep_ArmorHorseName()
 {
-	// 세팅 가져오기
-	UDataTable* ArmorTable = RtsSettings::GetArmorTable(GetOwner());
-
-	if (!ArmorTable) return;
-
 	FName ArmorRowName = GetEquipSlotRowName(EUnitEquipSlot::Horse);
-	FST_Armor* Data = ArmorTable->FindRow<FST_Armor>(ArmorRowName, TEXT(""));
-	if (Data)
+	FST_Armor ArmorData;
+	if (TryResolveArmorData(GetOwner(), ArmorRowName, ArmorData))
 	{
 		// Ensure both the new (with id) and legacy delegates are invoked for horse armor updates.
 		// Broadcasting on an unbound delegate is safe (no-op), so call both directly.
-		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Horse, *Data);
-		OnUpdateArmor.Broadcast(EEquipType::Horse, *Data);
+		OnUpdateArmorWithId.Broadcast(m_OwnerUniqueId, EEquipType::Horse, ArmorData);
+		OnUpdateArmor.Broadcast(EEquipType::Horse, ArmorData);
 		// 캐릭터 기마 상태 업데이트 로직 호출
 	}
 
@@ -599,30 +635,29 @@ void UEquipComponent::OnRep_BattleAnimType()
 
 void UEquipComponent::UpdateBattleAnimType()
 {
-	// 세팅 가져오기
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-
-	// 1. [가드 클로저] 서버 권한 및 데이터 테이블 유효성 확인
-	if (GetOwnerRole() != ROLE_Authority || !WeaponTable) return;
+	// 1. [가드 클로저] 서버 권한 확인
+	if (GetOwnerRole() != ROLE_Authority) return;
 
 	EBattleAnimType NewType = EBattleAnimType::None;
 
 	// 2. 무기 데이터 조회 (Null 체크 포함)
-	const FST_Weapon* RightData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlotRowName(EUnitEquipSlot::HandR), TEXT(""));
-	const FST_Weapon* LeftData = WeaponTable->FindRow<FST_Weapon>(GetEquipSlotRowName(EUnitEquipSlot::HandL), TEXT(""));
+	FST_Weapon RightWeaponData;
+	FST_Weapon LeftWeaponData;
+	const bool bHasRightData = TryResolveWeaponData(GetOwner(), GetEquipSlotRowName(EUnitEquipSlot::HandR), RightWeaponData);
+	const bool bHasLeftData = TryResolveWeaponData(GetOwner(), GetEquipSlotRowName(EUnitEquipSlot::HandL), LeftWeaponData);
 
 	// 3. 애니메이션 타입 결정 (우선순위 로직)
-	if (LeftData && LeftData->WeaponType == EWeaponType::Bow)
+	if (bHasLeftData && LeftWeaponData.WeaponType == EWeaponType::Bow)
 	{
 		// 왼손에 활이 있으면 우선적으로 Bow 타입 지정
 		NewType = EBattleAnimType::Bow;
 	}
-	else if (RightData && RightData->WeaponType == EWeaponType::Sword)
+	else if (bHasRightData && RightWeaponData.WeaponType == EWeaponType::Sword)
 	{
 		// 오른손에 검이 있으면 OneHandShield 타입 지정
 		NewType = EBattleAnimType::OneHandShield;
 	}
-	else if (RightData || LeftData)
+	else if (bHasRightData || bHasLeftData)
 	{
 		// 무기가 하나라도 있지만 위 조건에 해당하지 않을 경우의 기본값
 		NewType = EBattleAnimType::OneHandShield;
@@ -717,11 +752,8 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	const URtsGameSettings* GameSettings = GetDefault<URtsGameSettings>();
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-
 	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !WeaponTable || !WeaponClass) return;
+	if (!OwnerActor || !WeaponClass) return;
 
 	USkeletalMeshComponent* AttachMesh = nullptr;
 
@@ -756,11 +788,11 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 
 	// --- [새로운 무기 장착 로직] ---
 	// 3. 데이터 조회
-	FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponName, TEXT("Attachment"));
-	if (!Data) return;
+	FST_Weapon WeaponData;
+	if (!TryResolveWeaponData(GetOwner(), WeaponName, WeaponData)) return;
 
 	// 4. 제공해주신 데이터(WeaponType 등)를 기반으로 소켓 결정
-	FName FinalSocket = GetTargetSocketName(*Data, RequestedSlot);
+	FName FinalSocket = GetTargetSocketName(WeaponData, RequestedSlot);
 
 	// 5. 방패나 왼손 무기는 무조건 WeaponActor_L 변수에서 관리하도록 타겟 변수를 재설정합니다.
 	AWeapon** TargetActorVar = (FinalSocket == RightHandSocketName) ? &WeaponActor_R : &WeaponActor_L;
@@ -788,7 +820,7 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	}
 
 	// 초기화 및 부착
-	NewWeapon->InitializeWeapon(WeaponTable, WeaponName);
+	NewWeapon->InitializeWeaponData(WeaponData, WeaponName);
 
 	// --- [부착 로직 및 로그] ---
 	FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
@@ -809,19 +841,19 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	if (!SkillComp) return; // 스킬 컴포넌트 없으면 종료 (계단 방지)
 
 	// 인터페이스를 통한 데이터 확보 (포인터가 아닌 값 반환 대응)
-	FST_Weapon WeaponData = NewWeapon->GetWeaponData_Implementation();
+	FST_Weapon EquippedWeaponData = NewWeapon->GetWeaponData_Implementation();
 
 	// 스킬 등록 및 상세 로그 출력
-	if (!WeaponData.SkillName.IsNone())
+	if (!EquippedWeaponData.SkillName.IsNone())
 	{
-		SkillComp->AddSkill(WeaponData.SkillName);
-		UE_LOG(LogTemp, Log, TEXT("[%s] Added Skill: %s"), *GetOwner()->GetName(), *WeaponData.SkillName.ToString());
+		SkillComp->AddSkill(EquippedWeaponData.SkillName);
+		UE_LOG(LogTemp, Log, TEXT("[%s] Added Skill: %s"), *GetOwner()->GetName(), *EquippedWeaponData.SkillName.ToString());
 	}
 
-	if (!WeaponData.SkillNameRide.IsNone())
+	if (!EquippedWeaponData.SkillNameRide.IsNone())
 	{
-		SkillComp->AddSkill(WeaponData.SkillNameRide);
-		UE_LOG(LogTemp, Log, TEXT("[%s] Added Ride Skill: %s"), *GetOwner()->GetName(), *WeaponData.SkillNameRide.ToString());
+		SkillComp->AddSkill(EquippedWeaponData.SkillNameRide);
+		UE_LOG(LogTemp, Log, TEXT("[%s] Added Ride Skill: %s"), *GetOwner()->GetName(), *EquippedWeaponData.SkillNameRide.ToString());
 	}
 
 	// 화면에 최종 등록 결과 표시
@@ -829,7 +861,7 @@ void UEquipComponent::HandleWeaponAttachment(FName WeaponName, EWeaponSlot Reque
 	{
 		uint64 Key = (uint64)GetOwner()->GetUniqueID() + 61;
 		FString SkillMsg = FString::Printf(TEXT("Skills: [%s] / [%s]"),
-			*WeaponData.SkillName.ToString(), *WeaponData.SkillNameRide.ToString());
+			*EquippedWeaponData.SkillName.ToString(), *EquippedWeaponData.SkillNameRide.ToString());
 		GEngine->AddOnScreenDebugMessage(Key, 3.0f, FColor::Green, SkillMsg);
 	}
 }
@@ -846,9 +878,6 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 float UEquipComponent::GetAttackRange() const
 {
-	UDataTable* WeaponTable = RtsSettings::GetWeaponTable(GetOwner());
-	if (WeaponTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
-
 	UDataTable* UnitTable = RtsSettings::GetUnitTable(GetOwner());
 	if (UnitTable == nullptr) return 0.0f; // 데이터 테이블이 없으면 기본값 반환
 
@@ -856,20 +885,20 @@ float UEquipComponent::GetAttackRange() const
 	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
 	if (!RightRowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(RightRowName, TEXT("GetRange"));
-		if (WeaponData) return (float)WeaponData->AttackRange;
+		FST_Weapon WeaponData;
+		if (TryResolveWeaponData(GetOwner(), RightRowName, WeaponData)) return (float)WeaponData.AttackRange;
 	}
 
 	// 2. 차순위: 왼손 무기 데이터 확인 (활이나 양손 무기 대응)
 	const FName LeftRowName = GetEquipSlotRowName(EUnitEquipSlot::HandL);
 	if (!LeftRowName.IsNone())
 	{
-		FST_Weapon* WeaponData = WeaponTable->FindRow<FST_Weapon>(LeftRowName, TEXT("GetRange"));
-		if (WeaponData)
+		FST_Weapon WeaponData;
+		if (TryResolveWeaponData(GetOwner(), LeftRowName, WeaponData))
 		{
-			if (WeaponData->WeaponType != EWeaponType::Shield)
+			if (WeaponData.WeaponType != EWeaponType::Shield)
 			{
-				return (float)WeaponData->AttackRange;
+				return (float)WeaponData.AttackRange;
 			}
 		}
 	}

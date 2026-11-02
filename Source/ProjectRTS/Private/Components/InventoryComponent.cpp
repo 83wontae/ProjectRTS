@@ -124,21 +124,10 @@ void UInventoryComponent::AddItem(FName RowName)
 		return;
 	}
 
-	// 2. 데이터 테이블 유효성 검사
-	if (!ItemDataTable)
+	URTSItemDefinitionBase* ItemDefinition = nullptr;
+	if (!RtsSettings::TryGetItemDefinition(GetOwner(), RowName, ItemDefinition) || !ItemDefinition)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AddItem: ItemDataTable is not set."));
-		return;
-	}
-
-	// 3. FItem 구조체로 데이터 테이블 행 검색
-	static const FString ContextString(TEXT("AddItemContext"));
-	const FST_ItemBase* FoundItem = ItemDataTable->FindRow<FST_ItemBase>(RowName, ContextString);
-
-	if (!FoundItem)
-	{
-		// 데이터 테이블에 해당 Row가 없으면 중단 (Row Not Found)
-		UE_LOG(LogTemp, Warning, TEXT("AddItem: Row [%s] not found in DataTable."), *RowName.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("AddItem: Item definition not found. ItemId='%s'"), *RowName.ToString());
 		return;
 	}
 
@@ -156,11 +145,8 @@ void UInventoryComponent::AddItem(FName RowName)
 			FST_ItemInstance NewInstance;
 			NewInstance.InstanceId = InstanceId;
 			NewInstance.ItemId = RowName;
-			if (URTSItemDefinitionBase* Definition = RtsSettings::GetItemDefinition(GetOwner(), RowName))
-			{
-				NewInstance.ItemAssetId = Definition->GetPrimaryAssetId();
-				Slots[EmptySlotIndex].ItemAssetId = NewInstance.ItemAssetId;
-			}
+			NewInstance.ItemAssetId = ItemDefinition->GetPrimaryAssetId();
+			Slots[EmptySlotIndex].ItemAssetId = NewInstance.ItemAssetId;
 			NewInstance.Quantity = 1;
 			ItemInstances.Add(InstanceId, NewInstance);
 

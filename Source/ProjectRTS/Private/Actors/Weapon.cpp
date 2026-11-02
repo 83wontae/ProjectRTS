@@ -37,6 +37,23 @@ void AWeapon::UpdateWeaponMesh()
 		return;
 	}
 
+	if (bHasCachedWeaponData)
+	{
+		if (!CachedWeaponData.StaticMesh.IsNull())
+		{
+			UStaticMesh* LoadedMesh = CachedWeaponData.StaticMesh.LoadSynchronous();
+			WeaponMesh->SetStaticMesh(LoadedMesh);
+			return;
+		}
+
+		if (!CachedWeaponData.WorldMesh.IsNull())
+		{
+			UStaticMesh* LoadedMesh = CachedWeaponData.WorldMesh.LoadSynchronous();
+			WeaponMesh->SetStaticMesh(LoadedMesh);
+			return;
+		}
+	}
+
 	if (WeaponTable && !WeaponRowName.IsNone())
 	{
 		const FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT("UpdateWeaponMesh"));
@@ -63,11 +80,22 @@ void AWeapon::InitializeWeapon(UDataTable* InTable, FName InRowName)
 	if (InTable && !InRowName.IsNone())
 	{
 		WeaponTable = InTable;
+		bHasCachedWeaponData = false;
 		WeaponRowName = InRowName;
 
 		// 런타임/스폰 시 테이블과 RowName이 들어오면 메시 즉시 로드 및 갱신
 		UpdateWeaponMesh();
 	}
+}
+
+void AWeapon::InitializeWeaponData(const FST_Weapon& InData, FName InItemId)
+{
+	CachedWeaponData = InData;
+	bHasCachedWeaponData = true;
+	WeaponRowName = InItemId;
+	WeaponTable = nullptr;
+
+	UpdateWeaponMesh();
 }
 
 void AWeapon::ProcessWeaponHit()
@@ -146,6 +174,11 @@ bool AWeapon::IsCharRiding() const
 
 FST_Weapon AWeapon::GetWeaponData_Implementation() const
 {
+	if (bHasCachedWeaponData)
+	{
+		return CachedWeaponData;
+	}
+
 	if (WeaponTable && !WeaponRowName.IsNone())
 	{
 		FST_Weapon* Data = WeaponTable->FindRow<FST_Weapon>(WeaponRowName, TEXT("GetData"));

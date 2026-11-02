@@ -37,9 +37,19 @@ protected:
 	UPROPERTY(BlueprintReadWrite, Category = "Weapon|Data")
 	FName WeaponRowName;
 
+	/** DataAsset 경유로 주입된 무기 데이터 */
+	UPROPERTY(BlueprintReadWrite, Category = "Weapon|Data")
+	FST_Weapon CachedWeaponData;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Weapon|Data")
+	bool bHasCachedWeaponData = false;
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void InitializeWeapon(UDataTable* InTable, FName InRowName);
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void InitializeWeaponData(const FST_Weapon& InData, FName InItemId);
 
 	// --- 무기 공격 Hit 판정 처리 ---
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Combat")
