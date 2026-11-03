@@ -19,8 +19,6 @@ class PROJECTRTS_API URtsGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
-	UDataTable* GetWeaponDataTable();
-	UDataTable* GetArmorDataTable();
 	UDataTable* GetJobDataTable();
 	UDataTable* GetSkillDataTable();
 	bool TryGetUnitDefinitionByAssetId(const FPrimaryAssetId& UnitDefinitionId, URTSUnitDefinition*& OutUnitDefinition);
@@ -32,12 +30,6 @@ public:
 
 private:
 	// === 캐싱용 포인터만 남깁니다. Config나 EditAnywhere는 불필요합니다. ===
-	UPROPERTY()
-	UDataTable* CachedWeaponTable = nullptr;
-
-	UPROPERTY()
-	UDataTable* CachedArmorTable = nullptr;
-
 	UPROPERTY()
 	UDataTable* CachedJobTable = nullptr;
 

@@ -28,12 +28,6 @@ public:
 
 	// === 이곳에 Config 데이터가 있어야 합니다 ===
 	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
-	TSoftObjectPtr<UDataTable> WeaponDataTable;
-
-	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
-	TSoftObjectPtr<UDataTable> ArmorDataTable;
-
-	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
 	TSoftObjectPtr<UDataTable> JobDataTable;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
@@ -68,29 +62,11 @@ namespace RtsSettings
 		return false;
 	}
 
-	FORCEINLINE UDataTable* GetWeaponTable(const UObject* WorldContextObject)
-	{
-		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
-		{
-			return Instance->GetWeaponDataTable();
-		}
-		return nullptr;
-	}
-
 	FORCEINLINE UDataTable* GetJobTable(const UObject* WorldContextObject)
 	{
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
 			return Instance->GetJobDataTable();
-		}
-		return nullptr;
-	}
-
-	FORCEINLINE UDataTable* GetArmorTable(const UObject* WorldContextObject)
-	{
-		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
-		{
-			return Instance->GetArmorDataTable();
 		}
 		return nullptr;
 	}

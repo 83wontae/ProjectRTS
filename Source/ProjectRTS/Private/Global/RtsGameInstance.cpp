@@ -112,30 +112,6 @@ bool URtsGameInstance::TryGetUnitDefinitionById(FName UnitId, URTSUnitDefinition
 	return false;
 }
 
-UDataTable* URtsGameInstance::GetWeaponDataTable()
-{
-	if (CachedWeaponTable) return CachedWeaponTable;
-
-	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
-	if (Settings && !Settings->WeaponDataTable.IsNull())
-	{
-		CachedWeaponTable = Settings->WeaponDataTable.LoadSynchronous();
-	}
-	return CachedWeaponTable;
-}
-
-UDataTable* URtsGameInstance::GetArmorDataTable()
-{
-	if (CachedArmorTable) return CachedArmorTable;
-
-	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
-	if (Settings && !Settings->ArmorDataTable.IsNull())
-	{
-		CachedArmorTable = Settings->ArmorDataTable.LoadSynchronous();
-	}
-	return CachedArmorTable;
-}
-
 UDataTable* URtsGameInstance::GetJobDataTable()
 {
 	if (CachedJobTable) return CachedJobTable;

@@ -15,20 +15,9 @@ void ARtsGameMode::BeginPlay()
     // 2. CDO(Class Default Object) 기반으로 전역 개발자 세팅 객체를 안전하게 가져옵니다.
     if (GameInstance)
     {
-        // 이 함수 내부에서 LoadSynchronous()가 실행되며 하드디스크의 에셋이 RAM(메모리)에 올라가고 캐싱됩니다.
-        if (GameInstance->GetWeaponDataTable())
-        {
-            UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Weapon Data Table successfully pre-loaded into memory."));
-        }
-
         if (GameInstance->GetJobDataTable())
         {
             UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Job Data Table successfully pre-loaded into memory."));
-        }
-
-        if (GameInstance->GetArmorDataTable())
-        {
-            UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Armor Data Table successfully pre-loaded into memory."));
         }
     }
     else
