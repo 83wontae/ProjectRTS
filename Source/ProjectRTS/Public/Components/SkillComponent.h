@@ -57,9 +57,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RTS|Skill")
 	void ExecuteSkillEffect();
 
-	void ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target);
+	void ProcessMeleeHit(const class URTSSkillDefinition* SkillData, AActor* Target);
 
-	void SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc);
+	void SpawnProjectile(const class URTSSkillDefinition* SkillData, AActor* Target, FVector MuzzleLoc);
 
 	void UpdateDebugWidget();
 
@@ -73,17 +73,12 @@ private:
 
 	// 스킬 데이터 및 쿨타임 관리 (기존 유지)
 	UPROPERTY(EditAnywhere, Category = "RTS|Data")
-	TMap<FName, FST_Skill> m_SkillMap;
+	TMap<FName, TObjectPtr<class URTSSkillDefinition>> m_SkillMap;
 
 	TMap<FName, float> m_CooldownMap;
 
 	/** 현재 실행 중인 스킬의 이름을 저장 (Notify 시 데이터 참조용) */
 	FName CurrentActiveSkillName;
-
-protected:
-	/** 스킬 정보를 참조할 데이터 테이블 */
-	UPROPERTY(EditAnywhere, Category = "RTS|Data")
-	class UDataTable* SkillTable;
 
 public:
 	UPROPERTY(BlueprintAssignable, Category = "RTS|Events")

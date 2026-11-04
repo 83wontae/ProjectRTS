@@ -42,8 +42,8 @@ struct FST_CombatStats : public FTableRowBase
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Attack = 0.0;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double MaxHp = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Attack = 1.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double MaxHp = 100.0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) double Defend = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) double Speed = 0.0;
 

@@ -8,6 +8,7 @@
 #include "RtsGameInstance.generated.h"
 
 class URTSItemDefinitionBase;
+class URTSSkillDefinition;
 class URTSUnitDefinition;
 class URTSUnitJobDefinition;
 
@@ -20,7 +21,8 @@ class PROJECTRTS_API URtsGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
-	UDataTable* GetSkillDataTable();
+	bool TryGetSkillDefinitionById(FName SkillId, URTSSkillDefinition*& OutSkillDefinition);
+	URTSSkillDefinition* GetSkillDefinitionById(FName SkillId);
 	bool TryGetJobDefinitionById(FName JobId, URTSUnitJobDefinition*& OutJobDefinition);
 	URTSUnitJobDefinition* GetJobDefinitionById(FName JobId);
 	bool TryGetUnitDefinitionByAssetId(const FPrimaryAssetId& UnitDefinitionId, URTSUnitDefinition*& OutUnitDefinition);
@@ -32,9 +34,6 @@ public:
 
 private:
 	// === 캐싱용 포인터만 남깁니다. Config나 EditAnywhere는 불필요합니다. ===
-	UPROPERTY()
-	UDataTable* CachedSkillTable = nullptr;
-
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<URTSUnitDefinition>> CachedUnitDefinitionsById;
 
@@ -47,11 +46,16 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<URTSUnitJobDefinition>> CachedJobDefinitionsById;
 
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<URTSSkillDefinition>> CachedSkillDefinitionsById;
+
 	bool bUnitDefinitionCacheBuilt = false;
 	bool bItemDefinitionCacheBuilt = false;
 	bool bJobDefinitionCacheBuilt = false;
+	bool bSkillDefinitionCacheBuilt = false;
 
 	void BuildUnitDefinitionCacheIfNeeded();
 	void BuildItemDefinitionCacheIfNeeded();
 	void BuildJobDefinitionCacheIfNeeded();
+	void BuildSkillDefinitionCacheIfNeeded();
 };

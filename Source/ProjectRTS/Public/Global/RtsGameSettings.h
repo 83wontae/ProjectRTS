@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
-#include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
 #include "Global/RtsGameInstance.h"
 #include "Global/RTSItemTypes.h"
 #include "RtsGameSettings.generated.h"
 
 class URTSItemDefinitionBase;
+class URTSSkillDefinition;
 class URTSUnitDefinition;
 class URTSUnitJobDefinition;
 
@@ -27,8 +27,6 @@ public:
 	virtual FName GetCategoryName() const override { return TEXT("Game"); }
 	virtual FName GetSectionName() const override { return TEXT("RTSGameSettings"); }
 
-	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
-	TSoftObjectPtr<UDataTable> SkillDataTable;
 };
 
 namespace RtsSettings
@@ -79,13 +77,24 @@ namespace RtsSettings
 		return false;
 	}
 
-	FORCEINLINE UDataTable* GetSkillTable(const UObject* WorldContextObject)
+	FORCEINLINE URTSSkillDefinition* GetSkillDefinition(const UObject* WorldContextObject, FName SkillId)
 	{
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
-			return Instance->GetSkillDataTable();
+			return Instance->GetSkillDefinitionById(SkillId);
 		}
 		return nullptr;
+	}
+
+	FORCEINLINE bool TryGetSkillDefinition(const UObject* WorldContextObject, FName SkillId, URTSSkillDefinition*& OutSkillDefinition)
+	{
+		OutSkillDefinition = nullptr;
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->TryGetSkillDefinitionById(SkillId, OutSkillDefinition);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("TryGetSkillDefinition failed: RtsGameInstance is null. SkillId='%s'"), *SkillId.ToString());
+		return false;
 	}
 
 	FORCEINLINE URTSItemDefinitionBase* GetItemDefinition(const UObject* WorldContextObject, FName ItemId)

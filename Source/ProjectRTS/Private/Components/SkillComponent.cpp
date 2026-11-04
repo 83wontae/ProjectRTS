@@ -13,6 +13,7 @@
 #include "Components/DebugWidgetComponent.h"
 #include "Global/RtsGameSettings.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSSkillDefinition.h"
 
 USkillComponent::USkillComponent()
 {
@@ -154,7 +155,8 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 	}
 
 	// 4. 데이터 조회 및 Fallback 처리
-	const FST_Skill* SkillData = m_SkillMap.Find(SkillName);
+	const TObjectPtr<URTSSkillDefinition>* SkillDataPtr = m_SkillMap.Find(SkillName);
+	const URTSSkillDefinition* SkillData = SkillDataPtr ? SkillDataPtr->Get() : nullptr;
 
 	if (!SkillData && m_SkillMap.Num() > 0)
 	{
@@ -164,7 +166,8 @@ bool USkillComponent::UseSkill(FName SkillName, AActor* InTarget)
 		TArray<FName> Keys;
 		m_SkillMap.GetKeys(Keys);
 		SkillName = Keys[0];
-		SkillData = m_SkillMap.Find(SkillName);
+		SkillDataPtr = m_SkillMap.Find(SkillName);
+		SkillData = SkillDataPtr ? SkillDataPtr->Get() : nullptr;
 
 		UE_LOG(LogTemp, Warning, TEXT("[%s] Skill [%s] not found! Falling back to: [%s]"),
 			*ActorName,
@@ -249,32 +252,27 @@ FName USkillComponent::GetDefaultAttackSkillName()
 
 void USkillComponent::AddSkill(FName SkillName)
 {
-	// 1. 유효성 체크 (테이블이 없거나 이름이 비어있으면 종료)
-	if (!SkillTable || SkillName.IsNone())
+	if (SkillName.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] AddSkill: SkillTable is null or SkillName is None."), *GetOwner()->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[%s] AddSkill: SkillName is None."), *GetOwner()->GetName());
 		return;
 	}
 
-	// 2. 데이터 테이블에서 스킬 데이터 찾기
-	// SkillData.csv 형식이 FST_Skill 구조체와 매핑되어 있어야 합니다.
-	FST_Skill* FoundData = SkillTable->FindRow<FST_Skill>(SkillName, TEXT(""));
-
-	if (FoundData)
+	URTSSkillDefinition* SkillDefinition = nullptr;
+	if (!RtsSettings::TryGetSkillDefinition(GetOwner(), SkillName, SkillDefinition) || !SkillDefinition)
 	{
-		// 3. 맵에 추가 (이미 존재하면 업데이트됨)
-		m_SkillMap.Add(SkillName, *FoundData);
-
-		// --- [추가] 스킬이 추가될 때마다 디버그 위젯 갱신 ---
-		UpdateDebugWidget();
-
-		UE_LOG(LogTemp, Log, TEXT("[%s] Successfully added skill: %s"), *GetOwner()->GetName(), *SkillName.ToString());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] AddSkill: Failed to find skill [%s] in SkillTable!"),
+		UE_LOG(LogTemp, Error, TEXT("[%s] AddSkill: Failed to find skill definition [%s]."),
 			*GetOwner()->GetName(), *SkillName.ToString());
+		return;
 	}
+
+	// 3. 맵에 추가 (이미 존재하면 업데이트됨)
+	m_SkillMap.Add(SkillName, SkillDefinition);
+
+	// --- [추가] 스킬이 추가될 때마다 디버그 위젯 갱신 ---
+	UpdateDebugWidget();
+
+	UE_LOG(LogTemp, Log, TEXT("[%s] Successfully added skill: %s"), *GetOwner()->GetName(), *SkillName.ToString());
 }
 
 void USkillComponent::ClearSkills()
@@ -288,7 +286,8 @@ void USkillComponent::ExecuteSkillEffect()
 	// 1. [가드 클로저] 데이터 유효성 검사
 	if (!OwnerChar || CurrentActiveSkillName.IsNone()) return;
 
-	const FST_Skill* SkillData = m_SkillMap.Find(CurrentActiveSkillName);
+	const TObjectPtr<URTSSkillDefinition>* SkillDataPtr = m_SkillMap.Find(CurrentActiveSkillName);
+	const URTSSkillDefinition* SkillData = SkillDataPtr ? SkillDataPtr->Get() : nullptr;
 	if (!SkillData) return;
 
 	// 2. 타겟 및 공격력 정보 확보
@@ -338,7 +337,7 @@ void USkillComponent::ExecuteSkillEffect()
 	}
 }
 
-void USkillComponent::SpawnProjectile(const FST_Skill* SkillData, AActor* Target, FVector MuzzleLoc)
+void USkillComponent::SpawnProjectile(const URTSSkillDefinition* SkillData, AActor* Target, FVector MuzzleLoc)
 {
 	// 1. 가드: 하나라도 없으면 바로 퇴근
 	if (!Target || !SkillData->ProjectileClass || !OwnerChar) return;
@@ -383,7 +382,7 @@ void USkillComponent::UpdateDebugWidget()
 	DebugComp->UpdateLogList(SkillLogs);
 }
 
-void USkillComponent::ProcessMeleeHit(const FST_Skill* SkillData, AActor* Target)
+void USkillComponent::ProcessMeleeHit(const URTSSkillDefinition* SkillData, AActor* Target)
 {
 	// 1. [가드] 타겟 유효성 및 생존 확인
 	if (!Target || IUnitInterface::Execute_IsDeath(Target)) return;

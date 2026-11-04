@@ -6,6 +6,7 @@
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSSkillDefinition.h"
 #include "Global/RTSUnitJobDefinition.h"
 #include "Global/RTSUnitDefinition.h"
 
@@ -113,22 +114,72 @@ bool URtsGameInstance::TryGetUnitDefinitionById(FName UnitId, URTSUnitDefinition
 	return false;
 }
 
-UDataTable* URtsGameInstance::GetSkillDataTable()
+void URtsGameInstance::BuildSkillDefinitionCacheIfNeeded()
 {
-	// 1. 이미 캐싱되어 있다면 바로 반환
-	if (CachedSkillTable != nullptr)
+	if (bSkillDefinitionCacheBuilt)
 	{
-		return CachedSkillTable;
+		return;
 	}
 
-	// 2. 캐싱되어 있지 않다면 Settings에서 경로를 읽어와 로드
-	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
-	if (Settings && Settings->SkillDataTable.ToSoftObjectPath().IsValid())
+	bSkillDefinitionCacheBuilt = true;
+	CachedSkillDefinitionsById.Reset();
+
+	UAssetManager& AssetManager = UAssetManager::Get();
+	TArray<FPrimaryAssetId> AssetIds;
+	AssetManager.GetPrimaryAssetIdList(URTSSkillDefinition::AssetType, AssetIds);
+
+	for (const FPrimaryAssetId& AssetId : AssetIds)
 	{
-		CachedSkillTable = Settings->SkillDataTable.LoadSynchronous();
+		const FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
+		UObject* LoadedObject = AssetPath.IsValid() ? AssetPath.TryLoad() : nullptr;
+		URTSSkillDefinition* Definition = Cast<URTSSkillDefinition>(LoadedObject);
+		if (!Definition)
+		{
+			continue;
+		}
+
+		if (!Definition->SkillId.IsNone())
+		{
+			CachedSkillDefinitionsById.Add(Definition->SkillId, Definition);
+		}
+
+		if (!AssetId.PrimaryAssetName.IsNone())
+		{
+			CachedSkillDefinitionsById.Add(AssetId.PrimaryAssetName, Definition);
+		}
+	}
+}
+
+URTSSkillDefinition* URtsGameInstance::GetSkillDefinitionById(FName SkillId)
+{
+	URTSSkillDefinition* SkillDefinition = nullptr;
+	if (TryGetSkillDefinitionById(SkillId, SkillDefinition))
+	{
+		return SkillDefinition;
+	}
+	return nullptr;
+}
+
+bool URtsGameInstance::TryGetSkillDefinitionById(FName SkillId, URTSSkillDefinition*& OutSkillDefinition)
+{
+	OutSkillDefinition = nullptr;
+
+	if (SkillId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TryGetSkillDefinitionById failed: SkillId is None."));
+		return false;
 	}
 
-	return CachedSkillTable;
+	BuildSkillDefinitionCacheIfNeeded();
+
+	if (TObjectPtr<URTSSkillDefinition>* Found = CachedSkillDefinitionsById.Find(SkillId))
+	{
+		OutSkillDefinition = Found->Get();
+		return true;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("TryGetSkillDefinitionById failed: SkillId '%s' was not found."), *SkillId.ToString());
+	return false;
 }
 
 void URtsGameInstance::BuildJobDefinitionCacheIfNeeded()
