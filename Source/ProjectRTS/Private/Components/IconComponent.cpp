@@ -7,11 +7,7 @@
 UIconComponent::UIconComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-
-	// 월드 표기용 메시를 기본적으로 생성 (기본은 숨김 처리)
-	WorldMarkerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorldMarkerMesh"));
-	WorldMarkerMesh->SetupAttachment(this);
-	WorldMarkerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void UIconComponent::BeginPlay()
@@ -39,5 +35,5 @@ void UIconComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UIconComponent::UpdateIconColorByFaction(int32 Faction)
 {
-	// 진영 번호에 따라 MinimapIcon의 틴트나 WorldMarkerMesh의 머티리얼 변경
+	// 진영 번호에 따라 MinimapIcon의 틴트나 StaticMesh 머티리얼 변경
 }
