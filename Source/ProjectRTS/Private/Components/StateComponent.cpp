@@ -105,7 +105,7 @@ void UStateComponent::UpdateCombatStats()
     NewBase.Defend = (m_CurrentAttributes.Agility * 1.2);
     NewBase.Speed = 500.0 + (m_CurrentAttributes.Agility * 0.1);
 
-    m_BaseCombatStats = NewBase;
+    m_BaseCombatStats = bUseBaseCombatStatsOverride ? m_BaseCombatStatsOverride : NewBase;
 
     RecalculateTotalStats();
 }
@@ -148,6 +148,17 @@ void UStateComponent::SetEquipCombatStats(const FST_CombatStats& NewEquipStats)
     m_EquipCombatStats = NewEquipStats;
 
     RecalculateTotalStats();
+}
+
+void UStateComponent::SetBaseCombatStatsOverride(const FST_CombatStats& NewBaseCombatStats)
+{
+    bUseBaseCombatStatsOverride = true;
+    m_BaseCombatStatsOverride = NewBaseCombatStats;
+    m_BaseCombatStats = m_BaseCombatStatsOverride;
+
+    RecalculateTotalStats();
+    m_CurHp = m_TotalCombatStats.MaxHp;
+    OnRep_CurHp();
 }
 
 void UStateComponent::UpdateDebugWidget()

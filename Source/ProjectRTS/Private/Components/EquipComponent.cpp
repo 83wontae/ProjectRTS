@@ -490,7 +490,11 @@ void UEquipComponent::UpdateTotalEquipStats()
 	if (!StateComp) return;
 
 	// 2. 장비 추가 스탯(Equip) 계산 시작
-	FST_CombatStats NewEquipCombat;
+	FST_CombatStats NewEquipCombat{};
+	NewEquipCombat.Attack = 0.0;
+	NewEquipCombat.MaxHp = 0.0;
+	NewEquipCombat.Defend = 0.0;
+	NewEquipCombat.Speed = 0.0;
 
 	// 오른손 무기 공격력 합산
 	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);

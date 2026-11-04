@@ -64,6 +64,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     int32 GetFaction() const { return m_Faction; }
 
+    UFUNCTION(BlueprintCallable, Category = "RTS|State")
+    void SetFaction(int32 NewFaction) { m_Faction = NewFaction; }
+
     UFUNCTION(BlueprintPure, Category = "RTS|State")
     double GetTotalAttack() const { return m_TotalCombatStats.Attack; }
 
@@ -76,6 +79,9 @@ public:
     // 장비 컴포넌트에서 무기/방어구 수치가 바뀔 때 호출합니다.
     UFUNCTION(BlueprintCallable, Category = "RTS|State")
     void SetEquipCombatStats(const FST_CombatStats& NewEquipStats);
+
+    UFUNCTION(BlueprintCallable, Category = "RTS|State")
+    void SetBaseCombatStatsOverride(const FST_CombatStats& NewBaseCombatStats);
 
     /** 스탯 정보를 머리 위 위젯에 갱신하는 함수 */
     void UpdateDebugWidget();
@@ -111,6 +117,12 @@ private:
 
     UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
     FST_CombatStats m_TotalCombatStats;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    bool bUseBaseCombatStatsOverride = false;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State")
+    FST_CombatStats m_BaseCombatStatsOverride;
 
     void RecalculateTotalStats();
 
