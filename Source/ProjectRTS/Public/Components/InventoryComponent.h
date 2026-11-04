@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Engine/DataTable.h"
 #include "Global/ProjectRTSTypes.h"
 #include "InventoryComponent.generated.h"
 
@@ -50,10 +49,6 @@ public:
 	void CreateInvenSlots(int32 Count);
 
 public:
-	// 아이템 데이터 테이블 (에디터 디테일 패널에서 DT 지정)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory")
-	UDataTable* ItemDataTable;
-
 	// 인벤토리 슬롯 배열 (Slots 변수)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FST_ItemSlot> Slots;

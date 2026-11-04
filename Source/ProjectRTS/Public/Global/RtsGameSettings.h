@@ -12,6 +12,7 @@
 
 class URTSItemDefinitionBase;
 class URTSUnitDefinition;
+class URTSUnitJobDefinition;
 
 /**
  * */
@@ -25,10 +26,6 @@ public:
 
 	virtual FName GetCategoryName() const override { return TEXT("Game"); }
 	virtual FName GetSectionName() const override { return TEXT("RTSGameSettings"); }
-
-	// === 이곳에 Config 데이터가 있어야 합니다 ===
-	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
-	TSoftObjectPtr<UDataTable> JobDataTable;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Data Tables")
 	TSoftObjectPtr<UDataTable> SkillDataTable;
@@ -62,13 +59,24 @@ namespace RtsSettings
 		return false;
 	}
 
-	FORCEINLINE UDataTable* GetJobTable(const UObject* WorldContextObject)
+	FORCEINLINE URTSUnitJobDefinition* GetJobDefinition(const UObject* WorldContextObject, FName JobId)
 	{
 		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
 		{
-			return Instance->GetJobDataTable();
+			return Instance->GetJobDefinitionById(JobId);
 		}
 		return nullptr;
+	}
+
+	FORCEINLINE bool TryGetJobDefinition(const UObject* WorldContextObject, FName JobId, URTSUnitJobDefinition*& OutJobDefinition)
+	{
+		OutJobDefinition = nullptr;
+		if (URtsGameInstance* Instance = GetRtsInstance(WorldContextObject))
+		{
+			return Instance->TryGetJobDefinitionById(JobId, OutJobDefinition);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("TryGetJobDefinition failed: RtsGameInstance is null. JobId='%s'"), *JobId.ToString());
+		return false;
 	}
 
 	FORCEINLINE UDataTable* GetSkillTable(const UObject* WorldContextObject)

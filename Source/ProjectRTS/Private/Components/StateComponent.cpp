@@ -8,6 +8,7 @@
 #include "Core/RtsUnitCharacter.h"
 #include "Components/EquipComponent.h" // 장비 정보 접근을 위해 추가
 #include "Global/RtsGameSettings.h"
+#include "Global/RTSUnitJobDefinition.h"
 
 UStateComponent::UStateComponent() : m_CurHp(100.0)
 {
@@ -22,9 +23,9 @@ void UStateComponent::BeginPlay()
 
     if (m_JobRowName.IsNone()) m_JobRowName = TEXT("Novice");
 
-	UDataTable* JobDataTable = RtsSettings::GetJobTable(GetOwner());
-	if (!JobDataTable) {
-		UE_LOG(LogTemp, Error, TEXT("[%s] StateComponent: JobDataTable is null! Please check RtsGameSettings."), *GetOwner()->GetName());
+    URTSUnitJobDefinition* JobDefinition = RtsSettings::GetJobDefinition(GetOwner(), m_JobRowName);
+    if (!JobDefinition) {
+        UE_LOG(LogTemp, Error, TEXT("[%s] StateComponent: JobDefinition '%s' not found."), *GetOwner()->GetName(), *m_JobRowName.ToString());
 		return;
 	}
 
@@ -56,8 +57,8 @@ void UStateComponent::AddExp(double Amount)
 {
     if (Amount <= 0.0) return;
 
-    UDataTable* JobDataTable = RtsSettings::GetJobTable(GetOwner());
-    if (!JobDataTable) return;
+    URTSUnitJobDefinition* JobDefinition = RtsSettings::GetJobDefinition(GetOwner(), m_JobRowName);
+    if (!JobDefinition) return;
 
     m_CurrentExp += Amount;
 
@@ -67,11 +68,7 @@ void UStateComponent::AddExp(double Amount)
     {
         m_CurrentExp -= RequiredExp;
 
-        const FST_UnitJob* JobData = JobDataTable ? JobDataTable->FindRow<FST_UnitJob>(m_JobRowName, TEXT("")) : nullptr;
-        if (JobData)
-        {
-            m_AccumulatedAttributes = m_AccumulatedAttributes + JobData->GrowthAttributes;
-        }
+        m_AccumulatedAttributes = m_AccumulatedAttributes + JobDefinition->GrowthAttributes;
 
         m_CurrentLevel++;
 

@@ -15,9 +15,9 @@ void ARtsGameMode::BeginPlay()
     // 2. CDO(Class Default Object) 기반으로 전역 개발자 세팅 객체를 안전하게 가져옵니다.
     if (GameInstance)
     {
-        if (GameInstance->GetJobDataTable())
+        if (GameInstance->GetJobDefinitionById(TEXT("Novice")))
         {
-            UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Job Data Table successfully pre-loaded into memory."));
+            UE_LOG(LogTemp, Log, TEXT("ARtsGameMode: Job definition assets are available."));
         }
     }
     else

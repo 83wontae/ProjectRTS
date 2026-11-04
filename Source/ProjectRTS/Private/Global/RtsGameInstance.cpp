@@ -6,6 +6,7 @@
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Global/RTSItemDefinition.h"
+#include "Global/RTSUnitJobDefinition.h"
 #include "Global/RTSUnitDefinition.h"
 
 void URtsGameInstance::BuildUnitDefinitionCacheIfNeeded()
@@ -112,18 +113,6 @@ bool URtsGameInstance::TryGetUnitDefinitionById(FName UnitId, URTSUnitDefinition
 	return false;
 }
 
-UDataTable* URtsGameInstance::GetJobDataTable()
-{
-	if (CachedJobTable) return CachedJobTable;
-
-	const URtsGameSettings* Settings = GetDefault<URtsGameSettings>();
-	if (Settings && !Settings->JobDataTable.IsNull())
-	{
-		CachedJobTable = Settings->JobDataTable.LoadSynchronous();
-	}
-	return CachedJobTable;
-}
-
 UDataTable* URtsGameInstance::GetSkillDataTable()
 {
 	// 1. 이미 캐싱되어 있다면 바로 반환
@@ -140,6 +129,74 @@ UDataTable* URtsGameInstance::GetSkillDataTable()
 	}
 
 	return CachedSkillTable;
+}
+
+void URtsGameInstance::BuildJobDefinitionCacheIfNeeded()
+{
+	if (bJobDefinitionCacheBuilt)
+	{
+		return;
+	}
+
+	bJobDefinitionCacheBuilt = true;
+	CachedJobDefinitionsById.Reset();
+
+	UAssetManager& AssetManager = UAssetManager::Get();
+	TArray<FPrimaryAssetId> AssetIds;
+	AssetManager.GetPrimaryAssetIdList(URTSUnitJobDefinition::AssetType, AssetIds);
+
+	for (const FPrimaryAssetId& AssetId : AssetIds)
+	{
+		const FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
+		UObject* LoadedObject = AssetPath.IsValid() ? AssetPath.TryLoad() : nullptr;
+		URTSUnitJobDefinition* Definition = Cast<URTSUnitJobDefinition>(LoadedObject);
+		if (!Definition)
+		{
+			continue;
+		}
+
+		if (!Definition->JobId.IsNone())
+		{
+			CachedJobDefinitionsById.Add(Definition->JobId, Definition);
+		}
+
+		if (!AssetId.PrimaryAssetName.IsNone())
+		{
+			CachedJobDefinitionsById.Add(AssetId.PrimaryAssetName, Definition);
+		}
+	}
+}
+
+URTSUnitJobDefinition* URtsGameInstance::GetJobDefinitionById(FName JobId)
+{
+	URTSUnitJobDefinition* JobDefinition = nullptr;
+	if (TryGetJobDefinitionById(JobId, JobDefinition))
+	{
+		return JobDefinition;
+	}
+	return nullptr;
+}
+
+bool URtsGameInstance::TryGetJobDefinitionById(FName JobId, URTSUnitJobDefinition*& OutJobDefinition)
+{
+	OutJobDefinition = nullptr;
+
+	if (JobId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TryGetJobDefinitionById failed: JobId is None."));
+		return false;
+	}
+
+	BuildJobDefinitionCacheIfNeeded();
+
+	if (TObjectPtr<URTSUnitJobDefinition>* Found = CachedJobDefinitionsById.Find(JobId))
+	{
+		OutJobDefinition = Found->Get();
+		return true;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("TryGetJobDefinitionById failed: JobId '%s' was not found."), *JobId.ToString());
+	return false;
 }
 
 void URtsGameInstance::BuildItemDefinitionCacheIfNeeded()
