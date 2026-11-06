@@ -894,7 +894,7 @@ void UEquipComponent::EquipToWeapon(FName WeaponName)
 
 float UEquipComponent::GetAttackRange() const
 {
-	constexpr float DefaultUnarmedAttackRange = 150.0f;
+	constexpr float DefaultUnarmedAttackRange = 245.0f;
 
 	// 1. 우선순위: 오른손 무기 데이터 확인
 	const FName RightRowName = GetEquipSlotRowName(EUnitEquipSlot::HandR);
