@@ -83,6 +83,10 @@ struct FST_UnitSaveRecord
     /** 무한 성장의 핵심: 누적된 순수 속성치 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FST_Attributes AccumulatedAttributes;
+
+    /** 직업별 숙련도 진행도 */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TMap<FName, FST_JobProgress> JobProgressMap;
 };
 
 /** * 전체 게임 세이브 데이터 구조

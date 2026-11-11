@@ -27,11 +27,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Job Info")
 	TObjectPtr<UTexture2D> JobIcon = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base Stats")
-	FST_Attributes BaseAttributes;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Job Proficiency")
+	double ProficiencyExpPerLevel = 100.0;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Growth Stats")
-	FST_Attributes GrowthAttributes;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Job Proficiency")
+	int32 MaxProficiencyLevel = 999;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skills")
 	TArray<FName> StartingSkills;

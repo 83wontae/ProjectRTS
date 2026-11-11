@@ -12,6 +12,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, double, CurrentExp, 
 /** 레벨업 알림 (새로운 레벨) */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
 
+UENUM(BlueprintType)
+enum class EUnitStatType : uint8
+{
+    STR,
+    DEX,
+    INT
+};
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTRTS_API UStateComponent : public UActorComponent
 {
@@ -42,8 +50,29 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RTS|Level")
     void AddExp(double Amount);
 
+    UFUNCTION(BlueprintCallable, Category = "RTS|State|Stat")
+    void AddStatExp(EUnitStatType StatType, double Amount);
+
+    UFUNCTION(BlueprintCallable, Category = "RTS|State|Stat")
+    void AddStrengthActionExp(double Amount);
+
+    UFUNCTION(BlueprintCallable, Category = "RTS|State|Stat")
+    void AddDexterityActionExp(double Amount);
+
+    UFUNCTION(BlueprintCallable, Category = "RTS|State|Stat")
+    void AddIntelligenceActionExp(double Amount);
+
     UFUNCTION(BlueprintCallable, Category = "RTS|Level")
     void ChangeJob(FName NewJobRowName);
+
+    UFUNCTION(BlueprintCallable, Category = "RTS|Job")
+    void AddJobProficiencyExp(double Amount);
+
+    UFUNCTION(BlueprintPure, Category = "RTS|Job")
+    int32 GetCurrentJobProficiencyLevel() const;
+
+    UFUNCTION(BlueprintPure, Category = "RTS|Job")
+    double GetCurrentJobProficiencyExp() const;
 
     void RefreshFinalStats();
     void UpdateCombatStats();
@@ -88,7 +117,7 @@ public:
 
 private:
     // [근본] 모든 유닛이 동일하게 시작하는 기초 값 (1.0)
-    const FST_Attributes m_OriginAttributes = FST_Attributes(1.0, 1.0, 1.0, 1.0);
+    const FST_Attributes m_OriginAttributes = FST_Attributes(1.0, 1.0, 1.0);
 
     // [성장] 레벨업 시 현재 직업의 성장치가 누적되는 변수
     UPROPERTY(VisibleAnywhere, Category = "RTS|State")
@@ -104,8 +133,35 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "RTS|State")
     double m_CurrentExp = 0.0;
 
+    UPROPERTY(EditAnywhere, Category = "RTS|State|Stat", meta = (ClampMin = "1.0"))
+    double m_StrExpPerPoint = 100.0;
+
+    UPROPERTY(EditAnywhere, Category = "RTS|State|Stat", meta = (ClampMin = "1.0"))
+    double m_DexExpPerPoint = 100.0;
+
+    UPROPERTY(EditAnywhere, Category = "RTS|State|Stat", meta = (ClampMin = "1.0"))
+    double m_IntExpPerPoint = 100.0;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State|Stat")
+    double m_StrExp = 0.0;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State|Stat")
+    double m_DexExp = 0.0;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|State|Stat")
+    double m_IntExp = 0.0;
+
 	UPROPERTY(VisibleAnywhere, Category = "RTS|State")
-    FName m_JobRowName;
+    FName m_JobRowName = TEXT("Novice");
+
+    UPROPERTY(EditAnywhere, Category = "RTS|Job")
+    double m_DefaultJobProficiencyExpPerLevel = 100.0;
+
+    UPROPERTY(EditAnywhere, Category = "RTS|Job")
+    int32 m_DefaultJobMaxProficiencyLevel = 999;
+
+    UPROPERTY(VisibleAnywhere, Category = "RTS|Job")
+    TMap<FName, FST_JobProgress> m_JobProgressMap;
 
     // Attributes(힘,민,지)에서 계산된 순수 본체 능력치
     UPROPERTY(BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
@@ -125,6 +181,9 @@ private:
     FST_CombatStats m_BaseCombatStatsOverride;
 
     void RecalculateTotalStats();
+
+    void ApplyStatExpToAttribute(EUnitStatType StatType, double Amount);
+    void EnsureCurrentJobProficiencyInitialized();
 
 public:
     UPROPERTY(BlueprintAssignable, Category = "RTS|State|Events")

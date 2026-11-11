@@ -7,7 +7,7 @@
 #include "Global/RTSCoreTypes.h" // EUnitType 등을 사용하기 위해 포함
 #include "RTSUnitTypes.generated.h"
 
-/** * 유닛의 순수 속성 (힘, 민, 지, 체)
+/** * 유닛의 순수 속성 (STR, DEX, INT)
  * 모든 성장 연산의 기초가 되며, 연산자 오버로딩을 통해 합산이 가능합니다.
  */
 USTRUCT(BlueprintType)
@@ -16,22 +16,33 @@ struct FST_Attributes : public FTableRowBase
     GENERATED_BODY()
 
     FST_Attributes()
-        : Strength(0.0), Agility(0.0), Intelligence(0.0), Stamina(0.0) {}
+        : Strength(1.0), Dexterity(1.0), Intelligence(1.0) {}
 
-    FST_Attributes(double InStr, double InAgi, double InInt, double InSta)
-        : Strength(InStr), Agility(InAgi), Intelligence(InInt), Stamina(InSta) {}
+    FST_Attributes(double InStr, double InDex, double InInt)
+        : Strength(InStr), Dexterity(InDex), Intelligence(InInt) {}
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Strength = 0.0;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Agility = 0.0;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Intelligence = 0.0;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Stamina = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Strength = 1.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Dexterity = 1.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double Intelligence = 1.0;
 
     // 속성 합산을 위한 + 연산자 오버로딩
     FST_Attributes operator+(const FST_Attributes& Other) const
     {
-        return FST_Attributes(Strength + Other.Strength, Agility + Other.Agility,
-            Intelligence + Other.Intelligence, Stamina + Other.Stamina);
+        return FST_Attributes(Strength + Other.Strength, Dexterity + Other.Dexterity,
+            Intelligence + Other.Intelligence);
     }
+};
+
+USTRUCT(BlueprintType)
+struct FST_JobProgress
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Proficiency")
+    int32 Level = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Proficiency")
+    double CurrentExp = 0.0;
 };
 
 /** * 유닛의 최종 전투 능력치
@@ -58,8 +69,8 @@ struct FST_CombatStats : public FTableRowBase
     }
 };
 
-/** * 직업 정보 데이터 (DT_Job용)
- * 초기 스탯과 레벨업 시 상승하는 속성 증가치를 결정합니다.
+/** * 직업 정보 데이터 (레거시 호환용)
+ * 직업 숙련도 기준값과 시작 스킬 정보를 정의합니다.
  */
 USTRUCT(BlueprintType)
 struct FST_UnitJob : public FTableRowBase
@@ -72,13 +83,11 @@ struct FST_UnitJob : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Info")
     class UTexture2D* JobIcon;
 
-    /** 레벨 1일 때 부여받는 기본 능력치 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Stats")
-    FST_Attributes BaseAttributes;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Proficiency")
+    double ProficiencyExpPerLevel = 100.0;
 
-    /** 레벨업 시마다 누적되어 더해질 속성 증가치 */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Growth Stats")
-    FST_Attributes GrowthAttributes;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Job Proficiency")
+    int32 MaxProficiencyLevel = 999;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skills")
     TArray<FName> StartingSkills;

@@ -29,6 +29,8 @@ void UStateComponent::BeginPlay()
 		return;
 	}
 
+    EnsureCurrentJobProficiencyInitialized();
+
     RefreshFinalStats();
 
     m_CurHp = m_TotalCombatStats.MaxHp;
@@ -57,9 +59,6 @@ void UStateComponent::AddExp(double Amount)
 {
     if (Amount <= 0.0) return;
 
-    URTSUnitJobDefinition* JobDefinition = RtsSettings::GetJobDefinition(GetOwner(), m_JobRowName);
-    if (!JobDefinition) return;
-
     m_CurrentExp += Amount;
 
     double RequiredExp = GetRequiredExpForLevel(m_CurrentLevel);
@@ -67,8 +66,6 @@ void UStateComponent::AddExp(double Amount)
     while (m_CurrentExp >= RequiredExp)
     {
         m_CurrentExp -= RequiredExp;
-
-        m_AccumulatedAttributes = m_AccumulatedAttributes + JobDefinition->GrowthAttributes;
 
         m_CurrentLevel++;
 
@@ -90,9 +87,95 @@ void UStateComponent::AddExp(double Amount)
     UpdateDebugWidget();
 }
 
+void UStateComponent::AddStatExp(EUnitStatType StatType, double Amount)
+{
+    ApplyStatExpToAttribute(StatType, Amount);
+}
+
+void UStateComponent::AddStrengthActionExp(double Amount)
+{
+    ApplyStatExpToAttribute(EUnitStatType::STR, Amount);
+}
+
+void UStateComponent::AddDexterityActionExp(double Amount)
+{
+    ApplyStatExpToAttribute(EUnitStatType::DEX, Amount);
+}
+
+void UStateComponent::AddIntelligenceActionExp(double Amount)
+{
+    ApplyStatExpToAttribute(EUnitStatType::INT, Amount);
+}
+
+void UStateComponent::ApplyStatExpToAttribute(EUnitStatType StatType, double Amount)
+{
+    if (Amount <= 0.0)
+    {
+        return;
+    }
+
+    double RequiredExp = 100.0;
+    constexpr double MinStatValue = 1.0;
+    constexpr double MaxStatValue = 999.0;
+
+    double* TargetExp = nullptr;
+    double* TargetAccumulated = nullptr;
+
+    switch (StatType)
+    {
+    case EUnitStatType::STR:
+        TargetExp = &m_StrExp;
+        TargetAccumulated = &m_AccumulatedAttributes.Strength;
+        RequiredExp = FMath::Max(1.0, m_StrExpPerPoint);
+        break;
+    case EUnitStatType::DEX:
+        TargetExp = &m_DexExp;
+        TargetAccumulated = &m_AccumulatedAttributes.Dexterity;
+        RequiredExp = FMath::Max(1.0, m_DexExpPerPoint);
+        break;
+    case EUnitStatType::INT:
+        TargetExp = &m_IntExp;
+        TargetAccumulated = &m_AccumulatedAttributes.Intelligence;
+        RequiredExp = FMath::Max(1.0, m_IntExpPerPoint);
+        break;
+    default:
+        return;
+    }
+
+    if (!TargetExp || !TargetAccumulated)
+    {
+        return;
+    }
+
+    *TargetExp += Amount;
+
+    while (*TargetExp >= RequiredExp)
+    {
+        const double CurrentValue = FMath::Clamp(MinStatValue + *TargetAccumulated, MinStatValue, MaxStatValue);
+        if (CurrentValue >= MaxStatValue)
+        {
+            *TargetExp = 0.0;
+            break;
+        }
+
+        *TargetExp -= RequiredExp;
+        *TargetAccumulated += 1.0;
+    }
+
+    m_AccumulatedAttributes.Strength = FMath::Clamp(m_AccumulatedAttributes.Strength, 0.0, MaxStatValue - MinStatValue);
+    m_AccumulatedAttributes.Dexterity = FMath::Clamp(m_AccumulatedAttributes.Dexterity, 0.0, MaxStatValue - MinStatValue);
+    m_AccumulatedAttributes.Intelligence = FMath::Clamp(m_AccumulatedAttributes.Intelligence, 0.0, MaxStatValue - MinStatValue);
+
+    RefreshFinalStats();
+    UpdateDebugWidget();
+}
+
 void UStateComponent::RefreshFinalStats()
 {
     m_CurrentAttributes = m_OriginAttributes + m_AccumulatedAttributes;
+    m_CurrentAttributes.Strength = FMath::Clamp(m_CurrentAttributes.Strength, 1.0, 999.0);
+    m_CurrentAttributes.Dexterity = FMath::Clamp(m_CurrentAttributes.Dexterity, 1.0, 999.0);
+    m_CurrentAttributes.Intelligence = FMath::Clamp(m_CurrentAttributes.Intelligence, 1.0, 999.0);
 
     UpdateCombatStats();
 }
@@ -100,10 +183,10 @@ void UStateComponent::RefreshFinalStats()
 void UStateComponent::UpdateCombatStats()
 {
     FST_CombatStats NewBase;
-    NewBase.Attack = (m_CurrentAttributes.Strength * 1.0) + (m_CurrentAttributes.Agility * 0.2);
-    NewBase.MaxHp = (m_CurrentAttributes.Stamina * 10.0) + (m_CurrentAttributes.Strength * 2.0);
-    NewBase.Defend = (m_CurrentAttributes.Agility * 1.2);
-    NewBase.Speed = 500.0 + (m_CurrentAttributes.Agility * 0.1);
+    NewBase.Attack = (m_CurrentAttributes.Strength * 1.0) + (m_CurrentAttributes.Dexterity * 0.2);
+    NewBase.MaxHp = 100.0 + m_CurrentAttributes.Strength;
+    NewBase.Defend = (m_CurrentAttributes.Dexterity * 1.2);
+    NewBase.Speed = 500.0 + (m_CurrentAttributes.Dexterity * 0.1);
 
     m_BaseCombatStats = bUseBaseCombatStatsOverride ? m_BaseCombatStatsOverride : NewBase;
 
@@ -113,6 +196,83 @@ void UStateComponent::UpdateCombatStats()
 void UStateComponent::ChangeJob(FName NewJobRowName)
 {
     m_JobRowName = NewJobRowName;
+    EnsureCurrentJobProficiencyInitialized();
+}
+
+void UStateComponent::AddJobProficiencyExp(double Amount)
+{
+    if (Amount <= 0.0 || m_JobRowName.IsNone())
+    {
+        return;
+    }
+
+    EnsureCurrentJobProficiencyInitialized();
+
+    URTSUnitJobDefinition* JobDefinition = RtsSettings::GetJobDefinition(GetOwner(), m_JobRowName);
+    const double RequiredExp = (JobDefinition && JobDefinition->ProficiencyExpPerLevel > 0.0)
+        ? JobDefinition->ProficiencyExpPerLevel
+        : FMath::Max(1.0, m_DefaultJobProficiencyExpPerLevel);
+    const int32 MaxLevel = (JobDefinition && JobDefinition->MaxProficiencyLevel > 0)
+        ? JobDefinition->MaxProficiencyLevel
+        : FMath::Max(1, m_DefaultJobMaxProficiencyLevel);
+
+    FST_JobProgress& CurrentProgress = m_JobProgressMap.FindOrAdd(m_JobRowName);
+    int32& CurrentLevel = CurrentProgress.Level;
+    double& CurrentExp = CurrentProgress.CurrentExp;
+
+    if (CurrentLevel >= MaxLevel)
+    {
+        CurrentLevel = MaxLevel;
+        CurrentExp = 0.0;
+        UpdateDebugWidget();
+        return;
+    }
+
+    CurrentExp += Amount;
+    while (CurrentExp >= RequiredExp && CurrentLevel < MaxLevel)
+    {
+        CurrentExp -= RequiredExp;
+        CurrentLevel++;
+    }
+
+    if (CurrentLevel >= MaxLevel)
+    {
+        CurrentLevel = MaxLevel;
+        CurrentExp = 0.0;
+    }
+
+    UpdateDebugWidget();
+}
+
+int32 UStateComponent::GetCurrentJobProficiencyLevel() const
+{
+    if (const FST_JobProgress* FoundProgress = m_JobProgressMap.Find(m_JobRowName))
+    {
+        return FoundProgress->Level;
+    }
+    return 1;
+}
+
+double UStateComponent::GetCurrentJobProficiencyExp() const
+{
+    if (const FST_JobProgress* FoundProgress = m_JobProgressMap.Find(m_JobRowName))
+    {
+        return FoundProgress->CurrentExp;
+    }
+    return 0.0;
+}
+
+void UStateComponent::EnsureCurrentJobProficiencyInitialized()
+{
+    if (m_JobRowName.IsNone())
+    {
+        return;
+    }
+
+    if (!m_JobProgressMap.Contains(m_JobRowName))
+    {
+        m_JobProgressMap.Add(m_JobRowName, FST_JobProgress());
+    }
 }
 
 void UStateComponent::AddDamage(AController* EventInstigator, double Damage)
@@ -168,7 +328,9 @@ void UStateComponent::UpdateDebugWidget()
 
     TArray<FString> StatLogs;
     StatLogs.Add(FString::Printf(TEXT("Lv.%d | %s"), m_CurrentLevel, *m_JobRowName.ToString()));
-    StatLogs.Add(FString::Printf(TEXT("STR:%.1f AGI:%.1f INT:%.1f"), m_CurrentAttributes.Strength, m_CurrentAttributes.Agility, m_CurrentAttributes.Intelligence));
+    StatLogs.Add(FString::Printf(TEXT("JOB PROF Lv.%d (%.0f EXP)"), GetCurrentJobProficiencyLevel(), GetCurrentJobProficiencyExp()));
+    StatLogs.Add(FString::Printf(TEXT("STR:%.1f DEX:%.1f INT:%.1f"), m_CurrentAttributes.Strength, m_CurrentAttributes.Dexterity, m_CurrentAttributes.Intelligence));
+    StatLogs.Add(FString::Printf(TEXT("EXP STR:%.0f DEX:%.0f INT:%.0f"), m_StrExp, m_DexExp, m_IntExp));
     StatLogs.Add(FString::Printf(TEXT("ATK:%.1f HP:%.1f/%.1f"), m_TotalCombatStats.Attack, m_CurHp, m_TotalCombatStats.MaxHp));
 
     DebugComp->UpdateLogList(StatLogs);
@@ -240,6 +402,7 @@ FST_UnitSaveRecord UStateComponent::GetFullSaveData()
     SaveData.CurrentExp = m_CurrentExp; //
     SaveData.CurrentJob = m_JobRowName; //
     SaveData.AccumulatedAttributes = m_AccumulatedAttributes; //
+    SaveData.JobProgressMap = m_JobProgressMap;
 
     // 2. 장비 정보 추출 (EquipComponent 활용)
     if (UEquipComponent* EquipComp = GetOwner()->FindComponentByClass<UEquipComponent>())
@@ -285,8 +448,10 @@ void UStateComponent::LoadFromFullSaveData(const FST_UnitSaveRecord& InData)
     // 1. 성장 데이터 복구
     m_CurrentLevel = InData.Level;
     m_CurrentExp = InData.CurrentExp;
-    m_JobRowName = InData.CurrentJob;
+    m_JobRowName = InData.CurrentJob.IsNone() ? FName(TEXT("Novice")) : InData.CurrentJob;
     m_AccumulatedAttributes = InData.AccumulatedAttributes;
+    m_JobProgressMap = InData.JobProgressMap;
+    EnsureCurrentJobProficiencyInitialized();
 
     // 2. 최종 스탯 재계산 및 UI 갱신
     RefreshFinalStats();
