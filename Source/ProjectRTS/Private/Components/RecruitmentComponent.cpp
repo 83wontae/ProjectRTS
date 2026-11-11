@@ -82,6 +82,7 @@ void URecruitmentComponent::AddUnitToRoster(FName UnitAssetName, FName HandR, FN
     NewUnit.Level = 1; // 신규 고용은 1레벨부터
     NewUnit.UniqueId = FGuid::NewGuid();
     NewUnit.Name = UnitAssetName.ToString();
+    NewUnit.AccumulatedAttributes = FST_Attributes(0.0, 0.0, 0.0);
 
     const auto ResolveItemAssetId = [this](FName ItemRowName) -> FPrimaryAssetId
     {

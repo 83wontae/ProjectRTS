@@ -20,6 +20,7 @@ struct FST_UnitSaveRecord
     FST_UnitSaveRecord()
     {
         EquipSlots.SetNum(static_cast<int32>(EUnitEquipSlot::Max));
+        AccumulatedAttributes = FST_Attributes(0.0, 0.0, 0.0);
     }
 
     static int32 GetEquipSlotIndex(EUnitEquipSlot SlotType)

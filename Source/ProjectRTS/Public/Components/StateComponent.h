@@ -121,7 +121,7 @@ private:
 
     // [성장] 레벨업 시 현재 직업의 성장치가 누적되는 변수
     UPROPERTY(VisibleAnywhere, Category = "RTS|State")
-    FST_Attributes m_AccumulatedAttributes;
+    FST_Attributes m_AccumulatedAttributes = FST_Attributes(0.0, 0.0, 0.0);
 
     // [최종 속성] Origin + Accumulated (순수 체급)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RTS|State", meta = (AllowPrivateAccess = "true"))
